@@ -1,0 +1,105 @@
+.story-shell {
+  display: flex;
+  height: 100vh;
+  font-family: system-ui, sans-serif;
+}
+
+.character-sheet {
+  width: 16rem;
+  flex-shrink: 0;
+  padding: 1.5rem;
+  border-right: 1px solid #e5e4e7;
+  overflow-y: auto;
+}
+
+.character-sheet__subtitle {
+  color: #6b6375;
+  margin-top: -0.5rem;
+}
+
+.character-sheet__stats {
+  display: flex;
+  justify-content: space-between;
+  margin: 1rem 0;
+}
+
+.character-sheet__stats dt {
+  font-size: 0.75rem;
+  color: #6b6375;
+}
+
+.character-sheet__stats dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.character-sheet__abilities {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.character-sheet__abilities li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.character-sheet__ability-name {
+  font-weight: 600;
+}
+
+.story-shell__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.story-log {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.story-log__entry {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  max-width: 40rem;
+}
+
+.story-log__entry--dm {
+  background: #f4f3ec;
+}
+
+.story-log__entry--player {
+  background: #e5e4e7;
+  align-self: flex-end;
+}
+
+.story-log__entry--system {
+  font-style: italic;
+  color: #6b6375;
+}
+
+.choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.free-text-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.free-text-input input {
+  flex: 1;
+}

@@ -1,22 +1,16 @@
-import { useEffect, useState } from 'react'
-import './App.css'
+import { useState } from 'react'
+import type { Character } from '@tavern-tales/shared'
+import { CharacterCreationForm } from './features/characterCreation/CharacterCreationForm'
+import { StoryShell } from './features/story/StoryShell'
 
 function App() {
-  const [message, setMessage] = useState('Loading...')
+  const [character, setCharacter] = useState<Character | null>(null)
 
-  useEffect(() => {
-    fetch('/api/hello')
-      .then((res) => res.json())
-      .then((data) => setMessage(data.message))
-      .catch(() => setMessage('Could not reach the server.'))
-  }, [])
+  if (!character) {
+    return <CharacterCreationForm onCreate={setCharacter} />
+  }
 
-  return (
-    <main className="app">
-      <h1>Tavern Tales</h1>
-      <p>{message}</p>
-    </main>
-  )
+  return <StoryShell character={character} />
 }
 
 export default App

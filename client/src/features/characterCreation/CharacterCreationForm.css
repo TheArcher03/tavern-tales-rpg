@@ -1,0 +1,38 @@
+.character-creation {
+  max-width: 32rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-family: system-ui, sans-serif;
+}
+
+.character-creation__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.character-creation__error {
+  color: #b91c1c;
+}
+
+.ability-allocator__budget {
+  margin-bottom: 0.5rem;
+}
+
+.ability-allocator__table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.ability-allocator__table th,
+.ability-allocator__table td {
+  padding: 0.25rem 0.5rem;
+}
+
+.ability-allocator__score {
+  font-weight: 600;
+}

@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Stage 2 complete — character sheet data model + point-buy logic
+## Status: Stage 3 complete — core UI shell
 Date: 2026-08-19
 
 ## Tech stack (decided)
@@ -84,20 +84,68 @@ All in `shared/src/`, exported from `shared/src/index.ts`:
   `@tavern-tales/shared` yet. That starts in Stage 3 (character creation
   screen) and later in the DM tool-calling layer.
 
-## Next up (Stage 3): core UI shell
-- Story view (narrative text area), suggested-choice buttons, free-text
-  input box, and a character sheet panel — per README's "Choices"-style
-  branching narrative UI pillar.
-- This is the first place `@tavern-tales/shared` actually gets imported:
-  a character creation flow (race/class/background pickers + point-buy
-  allocator UI, using `validatePointBuy` for live point-remaining feedback)
-  feeding into `createCharacter`.
-- Decide how the created character is held in client state for now (plain
-  React state/context is enough — no need for a state library yet, and no
-  persistence layer exists until Stage 8).
-- Not yet needed: actual LLM integration, combat, leveling — those are
-  later stages. The `/api/hello` route from Stage 1 can be removed once a
-  real API route replaces it, or left as a harmless health check.
+## What's built (Stage 3)
+`client` now depends on `@tavern-tales/shared` (`"@tavern-tales/shared": "*"`
+in `client/package.json`, resolved via the npm workspace symlink — no build
+step needed since Vite transpiles the linked TS source directly).
+
+- `features/characterCreation/` — `CharacterCreationForm.tsx` (name input,
+  race/class/background `<select>`s populated straight from `RACES`/
+  `CHARACTER_CLASSES`/`BACKGROUNDS`) and `AbilityScoreAllocator.tsx` (a
+  +/− stepper per ability). The allocator disables `+` the moment the next
+  increment would exceed the 27-point budget and disables `−` at the
+  minimum score of 8, so an invalid allocation is impossible to reach
+  through the UI — `validatePointBuy` (for the live "points remaining"
+  readout) and `createCharacter` (on submit) are the only calls into
+  `shared` here. Submit is disabled until a name is entered and the
+  allocation is valid; a thrown error from `createCharacter` (e.g. unknown
+  id) surfaces as inline form text rather than crashing the app.
+- `features/story/` — `StoryShell.tsx` composes `CharacterSheet.tsx`
+  (name, race/class/background, HP/AC/proficiency bonus, all six ability
+  scores + modifiers — reads straight off the `Character` object plus
+  `getRace`/`getCharacterClass`/`getBackground` for display names),
+  `StoryLog.tsx` (scrolling transcript), `ChoiceButtons.tsx` (renders a
+  list of suggested strings), and `FreeTextInput.tsx` (text box + submit).
+  There's no DM yet — choosing a suggested choice or submitting free text
+  both just append a `player`-speaker entry to the log via one shared
+  `recordPlayerAction` callback, with a static intro line saying the DM
+  isn't connected. This is intentionally just wiring, not narrative logic;
+  that's Stage 4.
+- `App.tsx` holds `character: Character | null` in `useState` and switches
+  between `CharacterCreationForm` and `StoryShell` — no router or context
+  needed for two screens and this little prop-drilling.
+- Verified manually end to end in-browser: built a Human Fighter (STR 15
+  point-bought, remaining stats at 8) — confirmed the allocator blocked
+  over-budget and sub-minimum clicks, confirmed the character sheet showed
+  the correct derived values (STR 16 after the human +1, HP 9 = fighter
+  d10 + CON mod −1, AC 9 = 10 + DEX mod −1, proficiency +2), then clicked a
+  suggested choice and submitted free text and confirmed both landed in the
+  log in order.
+- `npm run build` (all three workspaces) and `npm run test -w shared`
+  (still 14/14) both pass.
+
+## Next up (Stage 4): LLM Dungeon Master integration
+- Wire the server to actually call the Claude API: needs a real
+  `ANTHROPIC_API_KEY` in `server/.env` (gitignored, never commit it) and
+  probably the `@anthropic-ai/sdk` package added to `server/package.json`.
+- Design the DM's tool-calling contract: what structured tools it can call
+  to change game state (the README's core design goal — narrate freely,
+  but mutate state only through defined tools so the DM can't contradict
+  itself). This will likely define its own types in `shared/` alongside
+  the `Character` model, e.g. a `DMTurnRequest`/`DMTurnResponse` shape and
+  a set of tool schemas (deal damage, adjust alignment, advance the scene).
+- Replace `StoryShell`'s local `recordPlayerAction`-only flow with a real
+  round-trip: player action → POST to a new server route → Claude call
+  with the character + story-so-far as context → narrated response (+ any
+  tool calls) → append to the log and apply state changes to the character.
+- The static `PLACEHOLDER_CHOICES` in `StoryShell.tsx` and the intro line
+  saying "the Dungeon Master is not connected" both need to go once the
+  real DM is generating suggested choices and opening narration itself.
+- The `/api/hello` route from Stage 1 can be deleted once a real DM route
+  exists, or left as a harmless health check — no strong reason either way.
+- Not yet needed: combat resolution, leveling, alignment tracking,
+  persistence — those are later stages; Stage 4 is specifically about
+  getting one narrated round-trip working.
 
 ## Notes for future sessions / continuity
 - This file should be updated at the end of every work session with what

@@ -3,8 +3,8 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Stage 1 complete — skeleton app running end to end
-Date: 2026-08-11
+## Status: Stage 2 complete — character sheet data model + point-buy logic
+Date: 2026-08-19
 
 ## Tech stack (decided)
 - **Client**: Vite + React + TypeScript (`client/`)
@@ -18,9 +18,17 @@ Date: 2026-08-11
   start with browser `localStorage` plus JSON export/import, since this is
   a single-player game with no multi-device sync requirement. Revisit only
   if that turns out to be insufficient.
-- Kept deliberately minimal: no test framework, linting config beyond the
-  Vite defaults (`oxlint`), or CI yet — add these when there's real code
-  worth protecting.
+- **Shared code**: a third workspace, `shared/` (`@tavern-tales/shared`),
+  holds game-rule types and pure logic that both `client` and `server` will
+  need (character data model now; DM tool-call schemas later). It exports
+  raw `.ts` directly (no build step required in dev) — `tsx` (server) and
+  Vite (client) both transpile workspace-linked TS on the fly. `npm run
+  build -w shared` still exists for a real `dist/` when needed.
+- No test framework added for `client`/`server` yet, but `shared` uses
+  Node's built-in `node:test` + `node:assert` (run via `tsx --test`) since
+  it's pure logic worth protecting with unit tests, and this needed no new
+  dependency. Revisit with a real framework (Vitest, etc.) if UI or server
+  logic later needs component/integration tests.
 
 ## What's built
 - `client/` — Vite React TS app scaffolded via `npm create vite@latest`,
@@ -42,19 +50,54 @@ Date: 2026-08-11
   installed via `nvm` (v24.19.0 LTS) since there was no Homebrew either.
   `nvm` init lines were added to `~/.zshrc`.
 
-## Next up (Stage 2): character sheet data model
-- Design the core TypeScript types for a character: six ability scores
-  (STR/DEX/CON/INT/WIS/CHA), race, class, background, derived modifiers,
-  HP, AC, proficiency bonus — based on the SRD 5.1 rules referenced in
-  README.md.
-- Implement point-buy allocation logic (SRD standard: 27-point buy) as
-  pure functions so they're easy to unit test later.
-- Decide where this lives: probably a `shared/` or `packages/core` workspace
-  so both `client` (character creation UI) and `server` (DM tool-calling
-  validation) can import the same types and validation logic without
-  duplication — worth deciding before Stage 3 UI work starts, since the UI
-  will want to import these types directly.
-- Not yet needed: persistence, leveling, combat — those are later stages.
+## What's built (Stage 2)
+All in `shared/src/`, exported from `shared/src/index.ts`:
+- `abilities.ts` — `AbilityName`/`AbilityScores` types, `abilityModifier`
+  (SRD floor((score-10)/2)), `proficiencyBonusForLevel` (+2 at level 1,
+  +1 every 4 levels).
+- `pointBuy.ts` — SRD standard 27-point buy: cost table for scores 8-15,
+  `pointBuyCost`, and `validatePointBuy` (returns valid/pointsUsed/
+  pointsRemaining/errors — used by `createCharacter` and reusable later by
+  a character-creation UI for live feedback as the player allocates points).
+- `race.ts`, `characterClass.ts`, `background.ts` — data-driven types
+  (`Race`, `CharacterClass`, `Background`) each with a small starter seed
+  array (4 races: Human/Elf/Dwarf/Halfling; 4 classes: Fighter/Wizard/
+  Rogue/Cleric; 4 backgrounds: Acolyte/Soldier/Criminal/Sage) and a
+  `get*(id)` lookup that throws on an unknown id. Deliberately not the full
+  SRD catalog (13 classes, 9 races, 13 backgrounds) — more can be added
+  incrementally without touching any other code, since everything reads
+  from these arrays.
+- `character.ts` — the `Character` interface (id, name, race/class/
+  background ids, level, base + final ability scores, ability modifiers,
+  proficiency bonus, hit points, armor class) and `createCharacter(input)`,
+  a pure factory that validates the point-buy allocation, applies racial
+  ability increases, and derives HP (class hit die + CON modifier) and AC
+  (10 + DEX modifier) for a level-1 character. Throws on invalid input
+  (bad point-buy spend, unknown race/class/background id) rather than
+  silently coercing, since a DM tool-call handler downstream needs to
+  reject bad state changes loudly, not guess.
+- 14 unit tests across `abilities.test.ts`, `pointBuy.test.ts`,
+  `character.test.ts` (`npm run test -w shared`, or `npm test` from root) —
+  all passing. `npm run typecheck -w shared` and root `npm run build` also
+  verified clean.
+- Not wired into `client` or `server` yet — no UI or API route imports
+  `@tavern-tales/shared` yet. That starts in Stage 3 (character creation
+  screen) and later in the DM tool-calling layer.
+
+## Next up (Stage 3): core UI shell
+- Story view (narrative text area), suggested-choice buttons, free-text
+  input box, and a character sheet panel — per README's "Choices"-style
+  branching narrative UI pillar.
+- This is the first place `@tavern-tales/shared` actually gets imported:
+  a character creation flow (race/class/background pickers + point-buy
+  allocator UI, using `validatePointBuy` for live point-remaining feedback)
+  feeding into `createCharacter`.
+- Decide how the created character is held in client state for now (plain
+  React state/context is enough — no need for a state library yet, and no
+  persistence layer exists until Stage 8).
+- Not yet needed: actual LLM integration, combat, leveling — those are
+  later stages. The `/api/hello` route from Stage 1 can be removed once a
+  real API route replaces it, or left as a harmless health check.
 
 ## Notes for future sessions / continuity
 - This file should be updated at the end of every work session with what

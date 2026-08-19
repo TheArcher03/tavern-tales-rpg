@@ -1,8 +1,4 @@
-export interface StoryEntry {
-  id: string
-  speaker: 'dm' | 'player' | 'system'
-  text: string
-}
+import type { StoryEntry } from '@tavern-tales/shared'
 
 export function StoryLog({ entries }: { entries: StoryEntry[] }) {
   return (

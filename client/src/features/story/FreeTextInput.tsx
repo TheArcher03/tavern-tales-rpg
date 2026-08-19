@@ -1,6 +1,11 @@
 import { useState, type FormEvent } from 'react'
 
-export function FreeTextInput({ onSubmit }: { onSubmit: (text: string) => void }) {
+interface FreeTextInputProps {
+  onSubmit: (text: string) => void
+  disabled?: boolean
+}
+
+export function FreeTextInput({ onSubmit, disabled = false }: FreeTextInputProps) {
   const [text, setText] = useState('')
 
   const handleSubmit = (event: FormEvent) => {
@@ -18,8 +23,11 @@ export function FreeTextInput({ onSubmit }: { onSubmit: (text: string) => void }
         onChange={(event) => setText(event.target.value)}
         placeholder="What do you do?"
         aria-label="Free-text action"
+        disabled={disabled}
       />
-      <button type="submit">Send</button>
+      <button type="submit" disabled={disabled}>
+        Send
+      </button>
     </form>
   )
 }

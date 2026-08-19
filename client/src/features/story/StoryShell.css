@@ -89,6 +89,12 @@
   color: #6b6375;
 }
 
+.story-shell__loading {
+  margin: 0;
+  font-style: italic;
+  color: #6b6375;
+}
+
 .choice-buttons {
   display: flex;
   flex-wrap: wrap;

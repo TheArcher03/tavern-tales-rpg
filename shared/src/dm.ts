@@ -16,6 +16,12 @@ export interface DmHitPointChange {
   reason: string
 }
 
+export interface DmAlignmentShift {
+  moralDelta?: number
+  ethicalDelta?: number
+  reason: string
+}
+
 export type DmCheckType = 'ability_check' | 'attack'
 
 export interface DmCheckResult extends CheckResult {
@@ -36,4 +42,5 @@ export interface DmTurnResult {
   hitPointChange?: DmHitPointChange
   checkResult?: DmCheckResult
   levelUpResult?: DmLevelUpResult
+  alignmentShift?: DmAlignmentShift
 }

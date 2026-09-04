@@ -67,12 +67,20 @@ export const LEVEL_UP_TOOL: Anthropic.Tool = {
   },
 }
 
+// Note: every field here is a flat scalar/array — no nested objects. With
+// more than one tool declared on the request (which is always true in
+// practice, since request_check/level_up are always offered alongside this
+// one), a nested-object field here has been observed to reliably corrupt:
+// the model emits stray tool-call-like syntax into the field instead of
+// clean JSON, spilling sibling keys out to the top level of the tool input.
+// Flattening every optional side effect into its own top-level field avoids
+// the nested object entirely and reproduced cleanly in testing.
 export const DM_TURN_TOOL: Anthropic.Tool = {
   name: 'narrate_turn',
   description:
-    'Narrate what happens next in the story and, only when something meaningfully harms or heals the ' +
-    'player character, report the hit point change. This is the only way to affect the character — ' +
-    'never describe a hit point change in narration without also reporting it here.',
+    'Narrate what happens next in the story and report any resulting state changes — hit points and/or ' +
+    'alignment. This is the only way those changes become real — never describe a hit point change or a ' +
+    'shift in the character\'s moral standing in prose without also reporting it here.',
   input_schema: {
     type: 'object',
     properties: {
@@ -87,20 +95,35 @@ export const DM_TURN_TOOL: Anthropic.Tool = {
         maxItems: 4,
         description: 'Two to four short, concrete suggested next actions for the player.',
       },
-      hitPointChange: {
-        type: 'object',
-        description: 'Only include this when the narration just described the character taking damage or healing.',
-        properties: {
-          delta: {
-            type: 'integer',
-            description: 'Positive to heal, negative to damage.',
-          },
-          reason: {
-            type: 'string',
-            description: 'Brief reason for the change, e.g. "grazed by a falling crate".',
-          },
-        },
-        required: ['delta', 'reason'],
+      hitPointDelta: {
+        type: 'integer',
+        description:
+          'Positive to heal, negative to damage. Only include this (and hitPointChangeReason) when the ' +
+          'narration just described the character taking damage or healing.',
+      },
+      hitPointChangeReason: {
+        type: 'string',
+        description: 'Required alongside hitPointDelta — brief reason for the change, e.g. "grazed by a falling crate".',
+      },
+      moralDelta: {
+        type: 'integer',
+        description:
+          'Shift toward good (positive) or evil (negative), typically 5 (minor) to 20 (major). Only ' +
+          'include this (and alignmentShiftReason) when the character just made a genuinely ' +
+          'alignment-defining choice — not a routine or morally trivial action. Most turns should omit ' +
+          'this entirely.',
+      },
+      ethicalDelta: {
+        type: 'integer',
+        description:
+          'Shift toward lawful (positive) or chaotic (negative), typically 5 (minor) to 20 (major). Only ' +
+          'include alongside a genuinely alignment-defining choice, same as moralDelta.',
+      },
+      alignmentShiftReason: {
+        type: 'string',
+        description:
+          'Required alongside moralDelta and/or ethicalDelta — brief reason for the shift, e.g. "spared a ' +
+          'defeated enemy who begged for mercy".',
       },
     },
     required: ['narration', 'suggestedChoices'],

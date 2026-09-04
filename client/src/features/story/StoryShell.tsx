@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Character, DmCheckResult, DmLevelUpResult, StoryEntry } from '@tavern-tales/shared'
+import {
+  alignmentLabel,
+  shiftAlignment,
+  type Character,
+  type DmAlignmentShift,
+  type DmCheckResult,
+  type DmLevelUpResult,
+  type StoryEntry,
+} from '@tavern-tales/shared'
 import { CharacterSheet } from './CharacterSheet'
 import { StoryLog } from './StoryLog'
 import { ChoiceButtons } from './ChoiceButtons'
@@ -25,13 +33,28 @@ function formatLevelUpResult(levelUp: DmLevelUpResult, characterName: string): s
   )
 }
 
+function formatAlignmentShift(shift: DmAlignmentShift, currentAlignment: Character['alignment']): string {
+  const parts: string[] = []
+  if (shift.moralDelta) {
+    parts.push(`${shift.moralDelta > 0 ? '+' : ''}${shift.moralDelta} moral (toward ${shift.moralDelta > 0 ? 'good' : 'evil'})`)
+  }
+  if (shift.ethicalDelta) {
+    parts.push(
+      `${shift.ethicalDelta > 0 ? '+' : ''}${shift.ethicalDelta} ethical (toward ${shift.ethicalDelta > 0 ? 'lawful' : 'chaotic'})`,
+    )
+  }
+  const newAlignment = shiftAlignment(currentAlignment, shift.moralDelta, shift.ethicalDelta)
+  return `⚖️ Alignment shifts ${parts.join(', ')} — ${shift.reason}. Now: ${alignmentLabel(newAlignment)}.`
+}
+
 interface StoryShellProps {
   character: Character
   onApplyHitPointChange: (delta: number) => void
   onApplyLevelUp: (result: DmLevelUpResult) => void
+  onApplyAlignmentShift: (shift: DmAlignmentShift) => void
 }
 
-export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp }: StoryShellProps) {
+export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, onApplyAlignmentShift }: StoryShellProps) {
   const [entries, setEntries] = useState<StoryEntry[]>([])
   const [suggestedChoices, setSuggestedChoices] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -65,6 +88,13 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp }:
             text: formatLevelUpResult(result.levelUpResult, characterRef.current.name),
           })
         }
+        if (result.alignmentShift) {
+          next.push({
+            id: crypto.randomUUID(),
+            speaker: 'system',
+            text: formatAlignmentShift(result.alignmentShift, characterRef.current.alignment),
+          })
+        }
         next.push({ id: crypto.randomUUID(), speaker: 'dm', text: result.narration })
         return next
       })
@@ -74,6 +104,9 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp }:
       }
       if (result.levelUpResult) {
         onApplyLevelUp(result.levelUpResult)
+      }
+      if (result.alignmentShift) {
+        onApplyAlignmentShift(result.alignmentShift)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'The Dungeon Master could not be reached.'

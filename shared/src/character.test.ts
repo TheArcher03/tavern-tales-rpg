@@ -41,6 +41,11 @@ test('createCharacter seeds skill proficiencies from the background', () => {
   assert.deepEqual(character.skillProficiencies, ['Athletics', 'Intimidation'])
 })
 
+test('createCharacter starts at True Neutral alignment', () => {
+  const character = createCharacter(validInput)
+  assert.deepEqual(character.alignment, { moral: 0, ethical: 0 })
+})
+
 test('createCharacter rejects an invalid point-buy allocation', () => {
   assert.throws(
     () => createCharacter({ ...validInput, baseAbilityScores: { STR: 15, DEX: 15, CON: 15, INT: 15, WIS: 15, CHA: 15 } }),

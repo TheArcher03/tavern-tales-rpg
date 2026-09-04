@@ -17,6 +17,15 @@
   margin-top: -0.5rem;
 }
 
+.character-sheet__alignment {
+  margin-top: -0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #aa3bff;
+}
+
 .character-sheet__stats {
   display: flex;
   justify-content: space-between;

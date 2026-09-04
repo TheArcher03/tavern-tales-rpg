@@ -1,4 +1,5 @@
 import { ABILITY_NAMES, abilityModifier, proficiencyBonusForLevel, type AbilityName, type AbilityScores } from './abilities.js'
+import type { Alignment } from './alignment.js'
 import { validatePointBuy } from './pointBuy.js'
 import { getRace } from './race.js'
 import { getCharacterClass } from './characterClass.js'
@@ -22,6 +23,8 @@ export interface Character {
   armorClass: number
   /** Seeded from the background at creation; grows on level-up. */
   skillProficiencies: SkillName[]
+  /** Starts at True Neutral (0, 0); shifts through story choices. */
+  alignment: Alignment
 }
 
 export interface CreateCharacterInput {
@@ -69,5 +72,6 @@ export function createCharacter(input: CreateCharacterInput): Character {
     hitPoints: { max: maxHp, current: maxHp },
     armorClass: 10 + abilityModifiers.DEX,
     skillProficiencies: [...background.skillProficiencies],
+    alignment: { moral: 0, ethical: 0 },
   }
 }

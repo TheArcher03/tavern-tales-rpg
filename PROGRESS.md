@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Stage 6 complete — leveling system, verified live end to end
+## Status: Stage 7 complete — alignment tracking, verified live end to end
 Date: 2026-08-19
 
 ## Tech stack (decided)
@@ -346,29 +346,96 @@ in Stage 5, applied to a second kind of state change.
   is now 29/29. `npm run build` (all three workspaces) and `npm test`
   both pass.
 
-## Next up (Stage 7): alignment tracking + branching consequences
-- Nothing in the character model or DM contract tracks alignment yet —
-  this is the last of the README's stated core pillars ("a good/evil, and
-  possibly law/chaos, alignment tracker that actually changes NPC
-  reactions and available story branches") that hasn't been touched.
-- Needs a place to live: probably a new field on `Character` (e.g. a
-  numeric good↔evil axis, and possibly a second law↔chaos axis, rather
-  than a single discrete label — a spectrum is easier to nudge
-  incrementally from many small choices than a single enum flip) plus a
-  fourth tool (or an extension of `narrate_turn`) for the DM to report a
-  shift when the player does something alignment-relevant, following the
-  same "state changes only through structured tool calls" discipline as
-  Stages 4–6.
-- "Changes NPC reactions and available story branches" is the harder,
-  more open-ended half of this pillar — the mechanical shift (a number
-  moving) is the easy part; making it *matter* means the system prompt
-  needs to actually tell the DM the character's current alignment and
-  instruct it to let that inform NPC attitudes and which suggested
-  choices appear. Worth deciding how strongly to lean on this before
-  diving in, since it's more "prompt craft + judgment" than code.
-- Not yet needed: persistence (Stage 8) — Stage 7 is specifically about
-  making alignment shifts real and narratively felt, the same scoping
-  discipline as Stages 4–6.
+## What's built (Stage 7)
+A moral (good↔evil) and ethical (lawful↔chaotic) spectrum, each -100..100,
+with a derived classic 9-cell D&D alignment label — the last of the
+README's stated core pillars. Folded into `narrate_turn` rather than given
+its own resolve-round-trip tool, since (unlike a dice roll) there's no
+secret math to hide from the model — the DM decides the shift size itself,
+same as `hitPointChange` already did.
+
+- `shared/src/alignment.ts` — `Alignment { moral, ethical }`,
+  `moralLabel`/`ethicalLabel` (thresholded at ±33 into Good/Neutral/Evil
+  and Lawful/Neutral/Chaotic), `alignmentLabel` (combines both into the
+  classic name — "True Neutral", "Neutral Good", "Lawful Neutral",
+  "Chaotic Evil", etc.), `clampAlignmentValue`, and `shiftAlignment`. Pure
+  and unit-tested the same way as the rest of `shared/`.
+- `shared/src/character.ts` — `Character` gained `alignment: Alignment`,
+  seeded at `{ moral: 0, ethical: 0 }` (True Neutral) for every new
+  character.
+- `shared/src/dm.ts` — added `DmAlignmentShift { moralDelta?, ethicalDelta?,
+  reason }` and an optional `alignmentShift` field on `DmTurnResult`.
+- `server/src/dm/systemPrompt.ts` — now states the character's current
+  alignment (label + both raw axis values) alongside HP/AC/skills, and
+  instructs the DM to let it carry real narrative weight: NPCs who'd
+  plausibly have heard of the character should react to their reputation,
+  and it should inform (never gate) suggested choices. This is the
+  "harder, more open-ended half" the Stage 6 notes flagged — mostly prompt
+  craft, not code.
+- **A real bug, found and fixed via live testing**: the first
+  implementation nested `alignmentShift` as an object under `narrate_turn`
+  (mirroring `hitPointChange`'s existing shape), and it reliably corrupted
+  — the model would emit stray tool-call-like syntax into the field
+  instead of clean JSON, spilling `ethicalDelta`/`reason` out as sibling
+  keys at the top level. Isolated debugging (a standalone script hitting
+  the real API directly, bypassing the app) proved this happens whenever
+  more than one tool is declared alongside a nested-object field — 3/3
+  failures with 2 or 3 tools present, 3/3 clean with only `narrate_turn`
+  declared alone. Since `request_check`/`level_up` are always offered
+  together with `narrate_turn` in this app, that's every real turn — this
+  wasn't a one-off glitch. The fix: `DM_TURN_TOOL`'s schema now has zero
+  nested objects — `hitPointChange` and `alignmentShift` are flattened
+  into top-level scalar fields (`hitPointDelta`/`hitPointChangeReason`,
+  `moralDelta`/`ethicalDelta`/`alignmentShiftReason`), confirmed 3/3 clean
+  after the change. `server/src/dm/sanitizeDmTurnResult.ts` reconstructs
+  the nested `DmHitPointChange`/`DmAlignmentShift` shapes our code still
+  uses internally from those flat wire fields, dropping anything that
+  doesn't parse rather than trusting a raw cast — this is also a general
+  hardening of `narrate_turn`'s freeform output (unlike `request_check`/
+  `level_up`, whose results are reconstructed server-side from validated
+  inputs, `narrate_turn`'s side-effect fields were previously trusted via
+  a direct `as DmTurnResult` cast with no validation at all).
+  **Implication for later stages**: any future tool field on `narrate_turn`
+  must stay flat — no nested objects — or it inherits this same failure
+  mode the moment a second tool is in play, which is always.
+- Client: `App.tsx` gained `applyAlignmentShift` (clamped via
+  `shiftAlignment`); `StoryShell.tsx` renders a `⚖️` log line showing the
+  delta and the resulting label (e.g. "Alignment shifts +10 moral (toward
+  good), -10 ethical (toward chaotic) — ... Now: True Neutral.");
+  `CharacterSheet.tsx` shows the current label under the character's
+  subtitle.
+- 8 new unit tests (`alignment.test.ts`) — shared suite is now 37/37.
+- Verified live end to end against the real Claude API, including the
+  bug hunt above: confirmed the corrupted nested-object failure 3/3 times
+  in isolation, confirmed the flattened-schema fix 3/3 clean in isolation,
+  then confirmed it end to end through the real app — a single turn where
+  the player shielded a fugitive with a false oath produced a failed
+  Deception check (`request_check`), a hit-point loss, *and* a correctly
+  net alignment shift (+10 moral, −10 ethical, landing back at True
+  Neutral) all in one coherent turn, rendered correctly in both the log
+  and the character sheet.
+- `npm run build` (all three workspaces) and `npm test` both pass.
+
+## Next up (Stage 8): save/load persistence
+- This is the one PROGRESS.md has called the hard requirement for a
+  genuine "campaign" — right now all state (`character`, the story log)
+  lives in React `useState` and vanishes on refresh. Simplest first cut
+  is almost certainly browser `localStorage`: serialize `{ character,
+  storyEntries }` after each turn, and on load, check for a saved game
+  before showing character creation.
+- `Character` and `StoryEntry` are already plain, JSON-serializable data
+  (no functions, no class instances) — this was true by construction
+  from Stage 2 onward, not something Stage 8 needs to arrange.
+- Needs a decision on multi-save vs. single-save: a single "continue your
+  game" slot is the simplest useful version; multiple named saves is a
+  natural follow-up but not required for "a campaign can be played across
+  sessions" to be true.
+- Also needs a "new game" / "abandon this character" affordance once a
+  save exists, since character creation currently always runs on mount
+  with no character — that flow needs to change once a save can exist.
+- Not yet needed: the modding/scripting layer (Stage 10) or further
+  polish/balancing (Stage 9) — Stage 8 is specifically about surviving a
+  refresh, the same scoping discipline as every stage so far.
 - Loose end from Stage 4, still unresolved: the `/api/hello` route from
   Stage 1 is still there, unused by the real app.
 

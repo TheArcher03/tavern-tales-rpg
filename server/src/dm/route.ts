@@ -5,6 +5,7 @@ import { DM_TURN_TOOL, LEVEL_UP_TOOL, REQUEST_CHECK_TOOL } from './tool.js'
 import { buildSystemPrompt } from './systemPrompt.js'
 import { resolveRequestedCheck, type RequestCheckInput } from './resolveRequestedCheck.js'
 import { resolveRequestedLevelUp, type LevelUpToolInput } from './resolveRequestedLevelUp.js'
+import { sanitizeDmTurnResult } from './sanitizeDmTurnResult.js'
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
 
@@ -85,7 +86,7 @@ dmRouter.post('/turn', async (req, res) => {
       }
 
       if (toolUse.name === DM_TURN_TOOL.name) {
-        const result = toolUse.input as DmTurnResult
+        const result = sanitizeDmTurnResult(toolUse.input)
         res.json({ ...result, checkResult, levelUpResult } satisfies DmTurnResult)
         return
       }

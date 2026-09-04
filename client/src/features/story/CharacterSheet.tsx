@@ -1,4 +1,4 @@
-import { ABILITY_NAMES, getBackground, getCharacterClass, getRace, type Character } from '@tavern-tales/shared'
+import { ABILITY_NAMES, alignmentLabel, getBackground, getCharacterClass, getRace, type Character } from '@tavern-tales/shared'
 
 function formatModifier(modifier: number): string {
   return modifier >= 0 ? `+${modifier}` : `${modifier}`
@@ -15,6 +15,7 @@ export function CharacterSheet({ character }: { character: Character }) {
       <p className="character-sheet__subtitle">
         Level {character.level} {race.name} {characterClass.name} &middot; {background.name}
       </p>
+      <p className="character-sheet__alignment">{alignmentLabel(character.alignment)}</p>
 
       <dl className="character-sheet__stats">
         <div>

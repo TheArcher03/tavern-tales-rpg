@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Character, DmLevelUpResult } from '@tavern-tales/shared'
+import { shiftAlignment, type Character, type DmAlignmentShift, type DmLevelUpResult } from '@tavern-tales/shared'
 import { CharacterCreationForm } from './features/characterCreation/CharacterCreationForm'
 import { StoryShell } from './features/story/StoryShell'
 
@@ -32,12 +32,24 @@ function App() {
     })
   }
 
+  const applyAlignmentShift = (shift: DmAlignmentShift) => {
+    setCharacter((current) => {
+      if (!current) return current
+      return { ...current, alignment: shiftAlignment(current.alignment, shift.moralDelta, shift.ethicalDelta) }
+    })
+  }
+
   if (!character) {
     return <CharacterCreationForm onCreate={setCharacter} />
   }
 
   return (
-    <StoryShell character={character} onApplyHitPointChange={applyHitPointChange} onApplyLevelUp={applyLevelUp} />
+    <StoryShell
+      character={character}
+      onApplyHitPointChange={applyHitPointChange}
+      onApplyLevelUp={applyLevelUp}
+      onApplyAlignmentShift={applyAlignmentShift}
+    />
   )
 }
 

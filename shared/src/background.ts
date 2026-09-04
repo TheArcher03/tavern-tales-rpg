@@ -1,7 +1,9 @@
+import type { SkillName } from './skills.js'
+
 export interface Background {
   id: string
   name: string
-  skillProficiencies: string[]
+  skillProficiencies: SkillName[]
 }
 
 // Starter set from the SRD 5.1 core backgrounds. More can be added as

@@ -3,6 +3,7 @@ import { validatePointBuy } from './pointBuy.js'
 import { getRace } from './race.js'
 import { getCharacterClass } from './characterClass.js'
 import { getBackground } from './background.js'
+import type { SkillName } from './skills.js'
 
 export interface Character {
   id: string
@@ -19,6 +20,8 @@ export interface Character {
   proficiencyBonus: number
   hitPoints: { max: number; current: number }
   armorClass: number
+  /** Seeded from the background at creation; grows on level-up. */
+  skillProficiencies: SkillName[]
 }
 
 export interface CreateCharacterInput {
@@ -30,8 +33,6 @@ export interface CreateCharacterInput {
   baseAbilityScores: AbilityScores
 }
 
-// Level 1 only for now — leveling up (HP growth, proficiency bonus increases,
-// new class features) is Stage 6 of the roadmap.
 export function createCharacter(input: CreateCharacterInput): Character {
   const validation = validatePointBuy(input.baseAbilityScores)
   if (!validation.valid) {
@@ -67,5 +68,6 @@ export function createCharacter(input: CreateCharacterInput): Character {
     proficiencyBonus: proficiencyBonusForLevel(level),
     hitPoints: { max: maxHp, current: maxHp },
     armorClass: 10 + abilityModifiers.DEX,
+    skillProficiencies: [...background.skillProficiencies],
   }
 }

@@ -1,7 +1,6 @@
 import {
   ABILITY_NAMES,
   SKILL_ABILITIES,
-  getBackground,
   isSkillName,
   resolveCheck,
   type AbilityName,
@@ -31,12 +30,11 @@ export function resolveRequestedCheck(character: Character, input: RequestCheckI
   const skill = input.skill && isSkillName(input.skill) ? input.skill : undefined
   const ability: AbilityName = skill ? SKILL_ABILITIES[skill] : isAbilityName(input.ability) ? input.ability : 'STR'
 
-  // Skill proficiency comes from the character's background (the only source
-  // modeled so far). Attacks assume proficiency with whatever weapon is in
+  // Skill proficiency is the character's own (growable) list — seeded from
+  // the background at creation, but no longer tied to it, since level-ups
+  // can add to it. Attacks assume proficiency with whatever weapon is in
   // use — per-weapon proficiency tracking isn't modeled yet.
-  const proficient = skill
-    ? getBackground(character.backgroundId).skillProficiencies.includes(skill)
-    : checkType === 'attack'
+  const proficient = skill ? character.skillProficiencies.includes(skill) : checkType === 'attack'
 
   const result = resolveCheck({
     abilityScore: character.abilityScores[ability],

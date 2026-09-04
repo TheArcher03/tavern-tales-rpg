@@ -3,6 +3,10 @@ export interface RollD20Options {
   random?: () => number
 }
 
-export function rollD20({ random = Math.random }: RollD20Options = {}): number {
-  return Math.floor(random() * 20) + 1
+export function rollDie(sides: number, { random = Math.random }: RollD20Options = {}): number {
+  return Math.floor(random() * sides) + 1
+}
+
+export function rollD20(options: RollD20Options = {}): number {
+  return rollDie(20, options)
 }

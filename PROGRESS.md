@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Stage 5 complete — turn-based combat / skill-check resolver, verified live end to end
+## Status: Stage 6 complete — leveling system, verified live end to end
 Date: 2026-08-19
 
 ## Tech stack (decided)
@@ -261,31 +261,114 @@ DM narrates the already-decided outcome rather than inventing one.
   shared suite is now 23/23. `npm run build` (all three workspaces) and
   `npm test` both pass.
 
-## Next up (Stage 6): leveling system
-- The character model is level-1-only so far (`createCharacter` always
-  produces a level-1 character; `proficiencyBonusForLevel` already
-  supports levels 1–20 from Stage 2, but nothing calls it with anything
-  but 1 yet). Stage 6 is where a character can actually gain a level:
-  HP increases (re-roll or take-the-average of the class hit die + CON
-  modifier, SRD 5.1 style), proficiency bonus steps up at the levels
-  `proficiencyBonusForLevel` already encodes, and "additional skill
-  points over time" per the README's pillar list — worth deciding what
-  that concretely means given the current model only grants skill
-  proficiencies via background, not a level-based skill-point system yet.
-- Needs an XP or milestone trigger — the DM doesn't currently have any
-  notion of story progress or experience points. Simplest first cut is
-  probably milestone leveling (the DM's `narrate_turn` or a new tool
-  signals "level up" at a significant story beat) rather than modeling
-  full SRD XP thresholds, but worth deciding deliberately rather than
-  defaulting to it.
-- This is a third tool candidate (or an extension of an existing one) —
-  the DM needs a way to trigger a level-up distinctly from narration and
-  from a `request_check`/`hitPointChange`, following the same
-  "state changes only through structured tool calls" discipline as
-  Stages 4 and 5.
-- Not yet needed: alignment tracking (Stage 7), persistence (Stage 8) —
-  Stage 6 is specifically about making one level-up work end to end, the
-  same scoping discipline as Stages 4 and 5.
+## What's built (Stage 6)
+Milestone-based leveling: the DM signals a level-up at a genuine story
+beat, the server rolls the class hit die and does the SRD 5.1 arithmetic,
+and the DM narrates the moment it's given rather than inventing numbers —
+the same propose → resolve → narrate pattern `request_check` established
+in Stage 5, applied to a second kind of state change.
+
+- `shared/src/dice.ts` — generalized: `rollDie(sides, options?)` now does
+  the actual work, and `rollD20()` is just `rollDie(20, ...)`. Needed for
+  hit dice, which vary by class (d6/d8/d10/d12).
+- `shared/src/background.ts` — `Background.skillProficiencies` tightened
+  from a bare `string[]` to `SkillName[]` (the existing data already
+  matched the canonical SRD names from Stage 5's `skills.ts`, so this was
+  a free type-safety upgrade, not a data change). Stage 5's notes had
+  flagged this as deferred; doing it now is what unblocked a proper
+  growable per-character skill list below.
+- `shared/src/character.ts` — `Character` gained `skillProficiencies:
+  SkillName[]`, seeded from the background at creation. This is the
+  concrete answer to the README's "unlocks additional skill points over
+  time" pillar: rather than an abstract point pool, a level-up can grant
+  one additional, DM-chosen skill proficiency, and this field is what
+  grows. `resolveRequestedCheck` (Stage 5) now reads proficiency from
+  `character.skillProficiencies` instead of doing a fresh
+  `getBackground(...)` lookup each time — same result at level 1, but now
+  correctly reflects anything gained since.
+- `shared/src/leveling.ts` — `resolveLevelUp({ currentLevel, hitDie,
+  conModifier, random? })`: increments the level, rolls the class hit die
+  for HP gained (floored at 1 per the SRD, even with a negative CON
+  modifier), and recomputes the proficiency bonus via the
+  `proficiencyBonusForLevel` that's existed since Stage 2. Throws past
+  level 20 (`MAX_LEVEL`). Pure and unit-tested the same way as
+  `check.ts`/`pointBuy.ts`.
+- `shared/src/dm.ts` — added `DmLevelUpResult` (extends `LevelUpResult`
+  with an optional `newSkillProficiency` and a `reason`) and an optional
+  `levelUpResult` field on `DmTurnResult`.
+- `server/src/dm/tool.ts` — a third tool, `level_up`, alongside
+  `request_check` and `narrate_turn`. Its description is explicit that
+  this should be rare ("only at a genuine story milestone... never
+  routinely or more than once in a short span") — leveling is DM
+  judgment, not something to gate behind a formal XP/milestone-count
+  system for now.
+- `server/src/dm/resolveRequestedLevelUp.ts` — turns a `level_up` tool
+  call into a resolved `DmLevelUpResult` via `resolveLevelUp` plus
+  skill-proficiency validation (the proposed `newSkillProficiency` must be
+  a real skill the character doesn't already have, or it's dropped rather
+  than trusted blindly — same defensive posture as Stage 5's ability
+  re-derivation). Throws if the character is already at level 20; the
+  route catches that and feeds it back to the model as a tool error
+  instead of failing the whole turn, so the DM can still narrate without
+  the level-up.
+- `server/src/dm/route.ts` — the Stage 5 loop now dispatches on three tool
+  names instead of two, and `MAX_ITERATIONS` went from 4 to 6 to leave
+  room for a turn that calls both `request_check` and `level_up` before
+  `narrate_turn`. The system prompt (`systemPrompt.ts`) documents all
+  three tools in sequence and now shows the character's *own*
+  `skillProficiencies` (not the background's) so the DM's picture stays
+  current after a level-up.
+- `App.tsx` gained `applyLevelUp`: bumps `level` and `proficiencyBonus`,
+  adds `hitPointsGained` to both current and max HP (a level-up heals
+  along with raising the cap, standard SRD behavior), and appends
+  `newSkillProficiency` to the character's skill list if present and not
+  already known. `StoryShell.tsx` renders a `levelUpResult`, when present,
+  as its own `system`-speaker log line — e.g. "⭐ Level up! Vex reaches
+  level 2 — +4 max HP, proficiency bonus +2, gained proficiency in
+  Investigation." — ahead of the narration, the same pattern as Stage 5's
+  dice-roll line.
+- Verified live end to end against the real Claude API: fed the DM a
+  story log describing a completed months-long mission and a player
+  action confirming it, and the DM correctly called `level_up` (reason:
+  closing out the job), the server resolved level 1→2 with +4 HP (rogue
+  d8 roll + CON modifier) and granted "Investigation" as a new skill
+  proficiency, and the follow-up narration correctly referenced "level 2
+  now: 13 hit points" (9 + 4) — confirmed via a direct `curl` against
+  `/api/dm/turn`. Separately, in the browser, a *meta* "time skip, level
+  me up" request with no actual earned story progress was correctly
+  **declined** by the DM, which is exactly the "rarely, only at genuine
+  milestones" discipline the system prompt asks for — a good sign, not a
+  bug, though it meant the live browser session itself didn't produce a
+  level-up to screenshot.
+- 6 new unit tests (`leveling.test.ts`, plus generalized `dice.test.ts`
+  coverage for `rollDie` at other die sizes, plus a
+  `character.test.ts` case for skill-proficiency seeding) — shared suite
+  is now 29/29. `npm run build` (all three workspaces) and `npm test`
+  both pass.
+
+## Next up (Stage 7): alignment tracking + branching consequences
+- Nothing in the character model or DM contract tracks alignment yet —
+  this is the last of the README's stated core pillars ("a good/evil, and
+  possibly law/chaos, alignment tracker that actually changes NPC
+  reactions and available story branches") that hasn't been touched.
+- Needs a place to live: probably a new field on `Character` (e.g. a
+  numeric good↔evil axis, and possibly a second law↔chaos axis, rather
+  than a single discrete label — a spectrum is easier to nudge
+  incrementally from many small choices than a single enum flip) plus a
+  fourth tool (or an extension of `narrate_turn`) for the DM to report a
+  shift when the player does something alignment-relevant, following the
+  same "state changes only through structured tool calls" discipline as
+  Stages 4–6.
+- "Changes NPC reactions and available story branches" is the harder,
+  more open-ended half of this pillar — the mechanical shift (a number
+  moving) is the easy part; making it *matter* means the system prompt
+  needs to actually tell the DM the character's current alignment and
+  instruct it to let that inform NPC attitudes and which suggested
+  choices appear. Worth deciding how strongly to lean on this before
+  diving in, since it's more "prompt craft + judgment" than code.
+- Not yet needed: persistence (Stage 8) — Stage 7 is specifically about
+  making alignment shifts real and narratively felt, the same scoping
+  discipline as Stages 4–6.
 - Loose end from Stage 4, still unresolved: the `/api/hello` route from
   Stage 1 is still there, unused by the real app.
 

@@ -41,6 +41,32 @@ export const REQUEST_CHECK_TOOL: Anthropic.Tool = {
   },
 }
 
+export const LEVEL_UP_TOOL: Anthropic.Tool = {
+  name: 'level_up',
+  description:
+    'Call this BEFORE narrating a level-up — only at a genuine story milestone (completing a significant ' +
+    'goal, overcoming a notable threat), never routinely or more than once in a short span. Do not decide ' +
+    "the character's new hit points or proficiency bonus yourself: the server rolls the class hit die and " +
+    'computes both, which you will then be given so you can call narrate_turn to describe the moment.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'Brief description of the milestone that earned this level, e.g. "delivered the sealed letter to the shrine".',
+      },
+      newSkillProficiency: {
+        type: 'string',
+        enum: Object.keys(SKILL_ABILITIES),
+        description:
+          'Optional: a skill the character has grown into through this milestone and is not already ' +
+          "proficient in. Omit if nothing fits — don't force one.",
+      },
+    },
+    required: ['reason'],
+  },
+}
+
 export const DM_TURN_TOOL: Anthropic.Tool = {
   name: 'narrate_turn',
   description:

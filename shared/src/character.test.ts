@@ -35,6 +35,12 @@ test('createCharacter sets level 1 proficiency bonus', () => {
   assert.equal(character.proficiencyBonus, 2)
 })
 
+test('createCharacter seeds skill proficiencies from the background', () => {
+  const character = createCharacter(validInput)
+  // Soldier background grants Athletics and Intimidation.
+  assert.deepEqual(character.skillProficiencies, ['Athletics', 'Intimidation'])
+})
+
 test('createCharacter rejects an invalid point-buy allocation', () => {
   assert.throws(
     () => createCharacter({ ...validInput, baseAbilityScores: { STR: 15, DEX: 15, CON: 15, INT: 15, WIS: 15, CHA: 15 } }),

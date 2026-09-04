@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Character, DmCheckResult, StoryEntry } from '@tavern-tales/shared'
+import type { Character, DmCheckResult, DmLevelUpResult, StoryEntry } from '@tavern-tales/shared'
 import { CharacterSheet } from './CharacterSheet'
 import { StoryLog } from './StoryLog'
 import { ChoiceButtons } from './ChoiceButtons'
@@ -17,12 +17,21 @@ function formatCheckResult(check: DmCheckResult): string {
   return `🎲 ${label}: rolled ${check.roll} ${signedModifier} = ${check.total} vs ${target} ${check.dc} — ${outcome}`
 }
 
+function formatLevelUpResult(levelUp: DmLevelUpResult, characterName: string): string {
+  const skillNote = levelUp.newSkillProficiency ? `, gained proficiency in ${levelUp.newSkillProficiency}` : ''
+  return (
+    `⭐ Level up! ${characterName} reaches level ${levelUp.newLevel} — ` +
+    `+${levelUp.hitPointsGained} max HP, proficiency bonus +${levelUp.newProficiencyBonus}${skillNote}.`
+  )
+}
+
 interface StoryShellProps {
   character: Character
   onApplyHitPointChange: (delta: number) => void
+  onApplyLevelUp: (result: DmLevelUpResult) => void
 }
 
-export function StoryShell({ character, onApplyHitPointChange }: StoryShellProps) {
+export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp }: StoryShellProps) {
   const [entries, setEntries] = useState<StoryEntry[]>([])
   const [suggestedChoices, setSuggestedChoices] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -49,12 +58,22 @@ export function StoryShell({ character, onApplyHitPointChange }: StoryShellProps
         if (result.checkResult) {
           next.push({ id: crypto.randomUUID(), speaker: 'system', text: formatCheckResult(result.checkResult) })
         }
+        if (result.levelUpResult) {
+          next.push({
+            id: crypto.randomUUID(),
+            speaker: 'system',
+            text: formatLevelUpResult(result.levelUpResult, characterRef.current.name),
+          })
+        }
         next.push({ id: crypto.randomUUID(), speaker: 'dm', text: result.narration })
         return next
       })
       setSuggestedChoices(result.suggestedChoices)
       if (result.hitPointChange) {
         onApplyHitPointChange(result.hitPointChange.delta)
+      }
+      if (result.levelUpResult) {
+        onApplyLevelUp(result.levelUpResult)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'The Dungeon Master could not be reached.'

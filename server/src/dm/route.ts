@@ -1,16 +1,17 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { Router } from 'express'
-import type { DmCheckResult, DmTurnRequest, DmTurnResult, StoryEntry } from '@tavern-tales/shared'
-import { DM_TURN_TOOL, REQUEST_CHECK_TOOL } from './tool.js'
+import type { DmCheckResult, DmLevelUpResult, DmTurnRequest, DmTurnResult, StoryEntry } from '@tavern-tales/shared'
+import { DM_TURN_TOOL, LEVEL_UP_TOOL, REQUEST_CHECK_TOOL } from './tool.js'
 import { buildSystemPrompt } from './systemPrompt.js'
 import { resolveRequestedCheck, type RequestCheckInput } from './resolveRequestedCheck.js'
+import { resolveRequestedLevelUp, type LevelUpToolInput } from './resolveRequestedLevelUp.js'
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
 
-// One request_check round trip, then narrate_turn, covers the normal case;
-// this just leaves room for an unusual turn (e.g. two checks) without
+// A request_check round trip and/or a level_up round trip, then narrate_turn,
+// covers the normal case; this just leaves room for an unusual turn without
 // letting a confused model loop forever.
-const MAX_ITERATIONS = 4
+const MAX_ITERATIONS = 6
 
 function formatStoryLog(storyLog: StoryEntry[]): string {
   if (storyLog.length === 0) return '(The adventure has not yet begun.)'
@@ -52,11 +53,12 @@ dmRouter.post('/turn', async (req, res) => {
       content:
         `Story so far:\n${formatStoryLog(storyLog)}\n\n` +
         `The player now does: ${playerAction}\n\n` +
-        'Respond by calling request_check (if the outcome is uncertain) or narrate_turn.',
+        'Respond by calling request_check or level_up (if warranted) or narrate_turn.',
     },
   ]
 
   let checkResult: DmCheckResult | undefined
+  let levelUpResult: DmLevelUpResult | undefined
 
   try {
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -66,7 +68,7 @@ dmRouter.post('/turn', async (req, res) => {
         output_config: { effort: 'medium' },
         system: buildSystemPrompt(character),
         messages,
-        tools: [REQUEST_CHECK_TOOL, DM_TURN_TOOL],
+        tools: [REQUEST_CHECK_TOOL, LEVEL_UP_TOOL, DM_TURN_TOOL],
       })
 
       if (message.stop_reason === 'refusal') {
@@ -84,7 +86,7 @@ dmRouter.post('/turn', async (req, res) => {
 
       if (toolUse.name === DM_TURN_TOOL.name) {
         const result = toolUse.input as DmTurnResult
-        res.json({ ...result, checkResult } satisfies DmTurnResult)
+        res.json({ ...result, checkResult, levelUpResult } satisfies DmTurnResult)
         return
       }
 
@@ -93,14 +95,26 @@ dmRouter.post('/turn', async (req, res) => {
         messages.push({ role: 'assistant', content: message.content })
         messages.push({
           role: 'user',
-          content: [
-            {
-              type: 'tool_result',
-              tool_use_id: toolUse.id,
-              content: JSON.stringify(checkResult),
-            },
-          ],
+          content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(checkResult) }],
         })
+        continue
+      }
+
+      if (toolUse.name === LEVEL_UP_TOOL.name) {
+        messages.push({ role: 'assistant', content: message.content })
+        try {
+          levelUpResult = resolveRequestedLevelUp(character, toolUse.input as LevelUpToolInput)
+          messages.push({
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(levelUpResult) }],
+          })
+        } catch (levelUpErr) {
+          const errorMessage = levelUpErr instanceof Error ? levelUpErr.message : 'Could not level up.'
+          messages.push({
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: errorMessage, is_error: true }],
+          })
+        }
         continue
       }
 

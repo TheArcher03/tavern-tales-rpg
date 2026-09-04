@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Stage 4 complete — LLM Dungeon Master integration, verified live end to end
+## Status: Stage 5 complete — turn-based combat / skill-check resolver, verified live end to end
 Date: 2026-08-19
 
 ## Tech stack (decided)
@@ -196,28 +196,98 @@ Stage 3.
 - `npm run build` (all three workspaces) passes; `npm run test -w shared`
   still 14/14 (unaffected by this stage).
 
-## Next up (Stage 5): turn-based combat / skill-check resolver
-- The one-tool DM contract from Stage 4 (`narrate_turn` + optional
-  `hitPointChange`) is deliberately minimal — no dice, no proficiency
-  bonus, no pass/fail. Stage 5 is where that becomes real: a roll (d20 +
-  ability modifier + proficiency bonus if proficient) vs. a DC, resolved
-  in code (not by asking the model to do arithmetic), with the DM's tool
-  call describing *what* is being attempted (e.g. `skill_check: { ability,
-  skill, dc }` or `attack: { targetAc }`) and the server resolving the
-  roll and reporting the outcome back into the next turn's context.
-- Decide where die-rolling logic lives — almost certainly `shared/`,
-  as pure functions (`rollD20()`, `resolveSkillCheck()`) so they're
-  unit-testable the same way `pointBuy.ts`/`character.ts` are, and so a
-  future client-side "you rolled a 14!" UI moment can reuse the same roll
-  without re-implementing it server-side.
-- This is also where a second tool (or an expanded `narrate_turn` schema)
-  is needed — Stage 4's tool only covers HP changes; combat needs the DM
-  to declare an attack/check attempt distinct from just narrating one.
-- Not yet needed: leveling (Stage 6), alignment (Stage 7), persistence
-  (Stage 8) — Stage 5 is specifically about making one resolved roll work,
-  the same scoping discipline as Stage 4's one-tool-call round trip.
-- Loose end from Stage 4 worth resolving whenever it comes up: the
-  `/api/hello` route from Stage 1 is still there, unused by the real app.
+## What's built (Stage 5)
+Dice rolls and skill/attack checks, resolved in code — the DM proposes an
+attempt and a difficulty, the server rolls and does the arithmetic, and the
+DM narrates the already-decided outcome rather than inventing one.
+
+- `shared/src/dice.ts` — `rollD20({ random? })`, a d20 roll with an
+  injectable random source (defaults to `Math.random`) so tests can pin
+  the result instead of asserting on randomness.
+- `shared/src/skills.ts` — `SKILL_ABILITIES`, the canonical SRD 5.1
+  skill → ability mapping (Athletics→STR, Stealth→DEX, Arcana→INT, etc.),
+  plus `isSkillName()`. This is the first place skills exist as a typed
+  concept — `background.ts`'s `skillProficiencies` was (and still is) a
+  bare `string[]`; tightening that to `SkillName[]` wasn't needed for this
+  stage and was left alone.
+- `shared/src/check.ts` — `resolveCheck({ abilityScore, dc, proficient,
+  proficiencyBonus, random? })`: SRD 5.1 math, d20 + ability modifier
+  (+ proficiency bonus if proficient) vs. a DC, returning `{ roll,
+  modifier, total, dc, success }`. Pure and unit-tested the same way as
+  `pointBuy.ts`.
+- `shared/src/dm.ts` — added `DmCheckResult` (extends `CheckResult` with
+  `checkType: 'ability_check' | 'attack'`, `ability`, optional `skill`,
+  and `reason`) and an optional `checkResult` field on `DmTurnResult`, so
+  a turn can report the roll it made alongside the narration.
+- `server/src/dm/tool.ts` — a second tool, `request_check`, alongside
+  `narrate_turn` from Stage 4. The DM calls `request_check` (ability/
+  skill, a DC it sets, a reason) *before* narrating anything uncertain;
+  the server resolves it and the DM only then calls `narrate_turn`,
+  narrating an outcome it's told rather than one it invents. This is the
+  "second tool" the Stage 4 notes flagged as needed.
+- `server/src/dm/resolveRequestedCheck.ts` — turns a `request_check` tool
+  call into a resolved `DmCheckResult`. Notably: if a `skill` is given, the
+  ability is *re-derived* from `SKILL_ABILITIES` rather than trusted from
+  whatever ability the model paired it with (tool-call inputs aren't
+  strictly schema-validated, so this keeps a model arithmetic/pairing slip
+  from silently changing the odds) — falls back to `'STR'` for anything
+  unrecognized rather than throwing mid-turn. Skill proficiency comes from
+  the character's background (the only source modeled so far); an attack
+  roll is simply assumed proficient (per-weapon proficiency isn't modeled
+  yet — every class this stage grants is combat-capable, so this is a fair
+  stand-in, not a real weapons-proficiency system).
+- `server/src/dm/route.ts` — turned into a small, bounded (max 4
+  iterations) manual agentic loop instead of one API call: call Claude
+  with both tools → if it calls `request_check`, resolve the roll, push
+  the assistant's tool call and a `tool_result` carrying the resolved
+  `DmCheckResult` back onto the message history, and loop → once it calls
+  `narrate_turn`, return that result with the last `checkResult` attached.
+  The system prompt (`systemPrompt.ts`) now explains the two-tool sequence
+  and tells the DM to skip `request_check` entirely for actions with no
+  real chance of failure.
+- `StoryShell.tsx` renders a `checkResult`, when present, as its own
+  `system`-speaker log line ahead of the narration — e.g. "🎲 Sleight of
+  Hand check: rolled 16 +3 = 19 vs DC 14 — Success!" — so the player sees
+  *why* the DM's narration went the way it did, not just the prose result.
+- Verified live end to end against the real Claude API (not just the
+  no-key error path this time): a rogue with a Criminal background
+  attempted to pickpocket a letter, the DM called `request_check` for a
+  Sleight of Hand check, the server resolved a DEX+proficiency roll
+  (16 + 3 = 19 vs DC 14, success), and the follow-up `narrate_turn` call
+  correctly narrated a successful theft — confirmed both via a direct
+  `curl` against `/api/dm/turn` and live in the browser, dice-roll line
+  and all.
+- 9 new unit tests (`dice.test.ts`, `check.test.ts`, `skills.test.ts`) —
+  shared suite is now 23/23. `npm run build` (all three workspaces) and
+  `npm test` both pass.
+
+## Next up (Stage 6): leveling system
+- The character model is level-1-only so far (`createCharacter` always
+  produces a level-1 character; `proficiencyBonusForLevel` already
+  supports levels 1–20 from Stage 2, but nothing calls it with anything
+  but 1 yet). Stage 6 is where a character can actually gain a level:
+  HP increases (re-roll or take-the-average of the class hit die + CON
+  modifier, SRD 5.1 style), proficiency bonus steps up at the levels
+  `proficiencyBonusForLevel` already encodes, and "additional skill
+  points over time" per the README's pillar list — worth deciding what
+  that concretely means given the current model only grants skill
+  proficiencies via background, not a level-based skill-point system yet.
+- Needs an XP or milestone trigger — the DM doesn't currently have any
+  notion of story progress or experience points. Simplest first cut is
+  probably milestone leveling (the DM's `narrate_turn` or a new tool
+  signals "level up" at a significant story beat) rather than modeling
+  full SRD XP thresholds, but worth deciding deliberately rather than
+  defaulting to it.
+- This is a third tool candidate (or an extension of an existing one) —
+  the DM needs a way to trigger a level-up distinctly from narration and
+  from a `request_check`/`hitPointChange`, following the same
+  "state changes only through structured tool calls" discipline as
+  Stages 4 and 5.
+- Not yet needed: alignment tracking (Stage 7), persistence (Stage 8) —
+  Stage 6 is specifically about making one level-up work end to end, the
+  same scoping discipline as Stages 4 and 5.
+- Loose end from Stage 4, still unresolved: the `/api/hello` route from
+  Stage 1 is still there, unused by the real app.
 
 ## Notes for future sessions / continuity
 - This file should be updated at the end of every work session with what

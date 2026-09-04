@@ -1,10 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { Router } from 'express'
-import type { DmTurnRequest, DmTurnResult, StoryEntry } from '@tavern-tales/shared'
-import { DM_TURN_TOOL } from './tool.js'
+import type { DmCheckResult, DmTurnRequest, DmTurnResult, StoryEntry } from '@tavern-tales/shared'
+import { DM_TURN_TOOL, REQUEST_CHECK_TOOL } from './tool.js'
 import { buildSystemPrompt } from './systemPrompt.js'
+import { resolveRequestedCheck, type RequestCheckInput } from './resolveRequestedCheck.js'
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5'
+
+// One request_check round trip, then narrate_turn, covers the normal case;
+// this just leaves room for an unusual turn (e.g. two checks) without
+// letting a confused model loop forever.
+const MAX_ITERATIONS = 4
 
 function formatStoryLog(storyLog: StoryEntry[]): string {
   if (storyLog.length === 0) return '(The adventure has not yet begun.)'
@@ -38,39 +44,71 @@ dmRouter.post('/turn', async (req, res) => {
   }
 
   const { character, storyLog, playerAction } = req.body
+  const client = new Anthropic({ apiKey })
+
+  const messages: Anthropic.MessageParam[] = [
+    {
+      role: 'user',
+      content:
+        `Story so far:\n${formatStoryLog(storyLog)}\n\n` +
+        `The player now does: ${playerAction}\n\n` +
+        'Respond by calling request_check (if the outcome is uncertain) or narrate_turn.',
+    },
+  ]
+
+  let checkResult: DmCheckResult | undefined
 
   try {
-    const client = new Anthropic({ apiKey })
-    const message = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      output_config: { effort: 'medium' },
-      system: buildSystemPrompt(character),
-      messages: [
-        {
+    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+      const message = await client.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        output_config: { effort: 'medium' },
+        system: buildSystemPrompt(character),
+        messages,
+        tools: [REQUEST_CHECK_TOOL, DM_TURN_TOOL],
+      })
+
+      if (message.stop_reason === 'refusal') {
+        res.status(502).json({ error: 'The Dungeon Master declined to continue this scene.' })
+        return
+      }
+
+      const toolUse = message.content.find(
+        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
+      )
+      if (!toolUse) {
+        res.status(502).json({ error: 'The Dungeon Master did not respond with a valid turn.' })
+        return
+      }
+
+      if (toolUse.name === DM_TURN_TOOL.name) {
+        const result = toolUse.input as DmTurnResult
+        res.json({ ...result, checkResult } satisfies DmTurnResult)
+        return
+      }
+
+      if (toolUse.name === REQUEST_CHECK_TOOL.name) {
+        checkResult = resolveRequestedCheck(character, toolUse.input as RequestCheckInput)
+        messages.push({ role: 'assistant', content: message.content })
+        messages.push({
           role: 'user',
-          content:
-            `Story so far:\n${formatStoryLog(storyLog)}\n\n` +
-            `The player now does: ${playerAction}\n\n` +
-            'Narrate what happens next by calling narrate_turn.',
-        },
-      ],
-      tools: [DM_TURN_TOOL],
-    })
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify(checkResult),
+            },
+          ],
+        })
+        continue
+      }
 
-    if (message.stop_reason === 'refusal') {
-      res.status(502).json({ error: 'The Dungeon Master declined to continue this scene.' })
+      res.status(502).json({ error: 'The Dungeon Master called an unexpected tool.' })
       return
     }
 
-    const toolUse = message.content.find((block) => block.type === 'tool_use')
-    if (!toolUse || toolUse.type !== 'tool_use') {
-      res.status(502).json({ error: 'The Dungeon Master did not respond with a valid turn.' })
-      return
-    }
-
-    const result = toolUse.input as DmTurnResult
-    res.json(result)
+    res.status(502).json({ error: 'The Dungeon Master could not resolve this turn.' })
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
       res.status(502).json({ error: 'The server’s Anthropic API key was rejected.' })

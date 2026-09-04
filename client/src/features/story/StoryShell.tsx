@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Character, StoryEntry } from '@tavern-tales/shared'
+import type { Character, DmCheckResult, StoryEntry } from '@tavern-tales/shared'
 import { CharacterSheet } from './CharacterSheet'
 import { StoryLog } from './StoryLog'
 import { ChoiceButtons } from './ChoiceButtons'
@@ -8,6 +8,14 @@ import { requestDmTurn } from './dmClient'
 import './StoryShell.css'
 
 const OPENING_ACTION = '(The adventure begins. Set the opening scene.)'
+
+function formatCheckResult(check: DmCheckResult): string {
+  const label = check.checkType === 'attack' ? 'Attack roll' : `${check.skill ?? check.ability} check`
+  const target = check.checkType === 'attack' ? 'AC' : 'DC'
+  const outcome = check.checkType === 'attack' ? (check.success ? 'Hit!' : 'Miss.') : check.success ? 'Success!' : 'Failure.'
+  const signedModifier = check.modifier >= 0 ? `+${check.modifier}` : `${check.modifier}`
+  return `🎲 ${label}: rolled ${check.roll} ${signedModifier} = ${check.total} vs ${target} ${check.dc} — ${outcome}`
+}
 
 interface StoryShellProps {
   character: Character
@@ -36,7 +44,14 @@ export function StoryShell({ character, onApplyHitPointChange }: StoryShellProps
         storyLog: entries,
         playerAction,
       })
-      setEntries((current) => [...current, { id: crypto.randomUUID(), speaker: 'dm', text: result.narration }])
+      setEntries((current) => {
+        const next = [...current]
+        if (result.checkResult) {
+          next.push({ id: crypto.randomUUID(), speaker: 'system', text: formatCheckResult(result.checkResult) })
+        }
+        next.push({ id: crypto.randomUUID(), speaker: 'dm', text: result.narration })
+        return next
+      })
       setSuggestedChoices(result.suggestedChoices)
       if (result.hitPointChange) {
         onApplyHitPointChange(result.hitPointChange.delta)

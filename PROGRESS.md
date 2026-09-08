@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Stage 7 complete — alignment tracking, verified live end to end
+## Status: Stage 8 complete — save/load persistence, verified live end to end
 Date: 2026-08-19
 
 ## Tech stack (decided)
@@ -416,26 +416,88 @@ same as `hitPointChange` already did.
   and the character sheet.
 - `npm run build` (all three workspaces) and `npm test` both pass.
 
-## Next up (Stage 8): save/load persistence
-- This is the one PROGRESS.md has called the hard requirement for a
-  genuine "campaign" — right now all state (`character`, the story log)
-  lives in React `useState` and vanishes on refresh. Simplest first cut
-  is almost certainly browser `localStorage`: serialize `{ character,
-  storyEntries }` after each turn, and on load, check for a saved game
-  before showing character creation.
-- `Character` and `StoryEntry` are already plain, JSON-serializable data
-  (no functions, no class instances) — this was true by construction
-  from Stage 2 onward, not something Stage 8 needs to arrange.
-- Needs a decision on multi-save vs. single-save: a single "continue your
-  game" slot is the simplest useful version; multiple named saves is a
-  natural follow-up but not required for "a campaign can be played across
-  sessions" to be true.
-- Also needs a "new game" / "abandon this character" affordance once a
-  save exists, since character creation currently always runs on mount
-  with no character — that flow needs to change once a save can exist.
-- Not yet needed: the modding/scripting layer (Stage 10) or further
-  polish/balancing (Stage 9) — Stage 8 is specifically about surviving a
-  refresh, the same scoping discipline as every stage so far.
+## What's built (Stage 8)
+Single-slot `localStorage` autosave — the hard requirement for a genuine
+multi-session "campaign," per the assessment earlier in this project's
+history. Character creation now only shows up when there's truly no saved
+game; otherwise the app resumes exactly where the player left off,
+including a page refresh, with no wasted DM call for a re-generated
+opening scene.
+
+- `client/src/features/persistence/gameSave.ts` — `GameSave { character,
+  storyEntries, suggestedChoices }` and `loadGame()`/`saveGame()`/
+  `clearGame()`, all wrapped in `try/catch` (storage can fail — quota,
+  private browsing — and losing the autosave isn't fatal, so failures are
+  swallowed rather than crashing the app) and validated with a runtime
+  type guard (`isGameSave`) rather than trusting whatever JSON happens to
+  be sitting under the key. One save slot, not named/multiple saves — the
+  simplest thing that makes "a campaign survives a refresh" true; multiple
+  saves would be a natural but unrequired follow-up.
+- `App.tsx` — `character`, `entries`, and `suggestedChoices` all moved up
+  from `StoryShell` into `App` (read once from `loadGame()` at module
+  scope for the initial state), since all three needed to be in one place
+  to autosave together. A single `useEffect` calls `saveGame(...)`
+  whenever any of the three changes. Added `startNewGame()` — confirms via
+  `window.confirm`, then clears storage and resets all three to empty —
+  and a "Start a new adventure" link in `StoryShell` wired to it.
+- `StoryShell.tsx` — no longer owns `entries`/`suggestedChoices` as local
+  state; both are now props with `onEntriesChange`/`onSuggestedChoicesChange`
+  callbacks, making it a fully controlled component. The mount effect that
+  fires the opening DM turn now also checks `entries.length === 0` (not
+  just the existing StrictMode-double-invoke guard) — resuming a save with
+  history already present skips the opening call entirely rather than
+  re-narrating a fresh scene on top of a resumed one.
+- `Character` and `StoryEntry` needed no changes to become
+  JSON-serializable — true by construction since Stage 2 (no functions, no
+  class instances), so Stage 8 didn't need to arrange anything there.
+- Verified live end to end in-browser: played two real turns against the
+  live Claude API, confirmed the autosave landed in `localStorage` after
+  each (checked directly via injected JS, not just inference), refreshed
+  the page and confirmed the exact same story log, choices, and character
+  sheet came back with **no new DM call fired** (the automated browser
+  environment auto-dismisses native `confirm()` dialogs, which was itself
+  useful confirmation that the "cancel" path of `startNewGame` correctly
+  does nothing), then stubbed `window.confirm` to return `true` and
+  confirmed "Start a new adventure" correctly cleared `localStorage` and
+  returned to a blank character creation screen that stayed blank across
+  a further refresh.
+- `npm run build` (all three workspaces) and `npm test` (still 37/37,
+  unaffected — this stage was client-only) both pass.
+
+## Where this leaves the project
+Per the assessment when Stage 6 started: two stages were called out as
+hard requirements before this could be called a genuinely operating
+campaign — leveling (Stage 6) and persistence (Stage 8, this one). Both
+are done, and alignment (Stage 7, the third README pillar) is done too.
+**The core game loop described in the README is now fully playable
+end to end and survives a refresh.** What's left on the original roadmap
+is Stage 9 (polish, balancing, playtesting — inherently ongoing, not a
+single discrete milestone) and Stage 10 (a modding/scripting layer,
+explicitly called out as future work in the README, not required for
+playability).
+
+## Next up (Stage 9): polish, balancing, playtesting
+- Unlike Stages 1–8, this isn't a single feature to build — it's an
+  open-ended pass. Concrete, scoped candidates to pick from rather than
+  a single mandatory next step:
+  - **Content breadth**: `shared/`'s race/class/background data is still
+    a deliberately small starter set (4 races, 4 classes, 4 backgrounds)
+    from Stage 2 — expanding toward the full SRD 5.1 list is pure data
+    entry, no architecture change needed.
+  - **Balancing**: no actual playtesting has happened beyond short,
+    deliberately-engineered test scenarios to verify each mechanic works.
+    Longer real sessions would surface whether DC/damage/level-up
+    judgment calls (all currently the DM's unconstrained discretion) feel
+    fair over time.
+  - **Combat depth**: Stage 5's `request_check` covers a single roll
+    per attempt; there's no initiative order, no multi-enemy tracking, no
+    concept of "the fight continues across turns" beyond what the DM
+    holds in the narrated story log — worth deciding whether that's
+    sufficient or whether combat needs its own structured state.
+  - **UI polish**: the interface has been functional-not-polished since
+    Stage 3 by design (explicitly deferred). A real pass on layout,
+    typography, and the point-buy/character-creation flow would matter
+    once the mechanics underneath are this far along.
 - Loose end from Stage 4, still unresolved: the `/api/hello` route from
   Stage 1 is still there, unused by the real app.
 

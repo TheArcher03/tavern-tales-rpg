@@ -118,3 +118,19 @@
 .free-text-input input {
   flex: 1;
 }
+
+.story-shell__new-game {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  color: #6b6375;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.story-shell__new-game:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

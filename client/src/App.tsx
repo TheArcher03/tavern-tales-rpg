@@ -1,10 +1,27 @@
-import { useState } from 'react'
-import { shiftAlignment, type Character, type DmAlignmentShift, type DmLevelUpResult } from '@tavern-tales/shared'
+import { useEffect, useState } from 'react'
+import {
+  shiftAlignment,
+  type Character,
+  type DmAlignmentShift,
+  type DmLevelUpResult,
+  type StoryEntry,
+} from '@tavern-tales/shared'
 import { CharacterCreationForm } from './features/characterCreation/CharacterCreationForm'
 import { StoryShell } from './features/story/StoryShell'
+import { clearGame, loadGame, saveGame } from './features/persistence/gameSave'
+
+const savedGame = loadGame()
 
 function App() {
-  const [character, setCharacter] = useState<Character | null>(null)
+  const [character, setCharacter] = useState<Character | null>(savedGame?.character ?? null)
+  const [entries, setEntries] = useState<StoryEntry[]>(savedGame?.storyEntries ?? [])
+  const [suggestedChoices, setSuggestedChoices] = useState<string[]>(savedGame?.suggestedChoices ?? [])
+
+  useEffect(() => {
+    if (character) {
+      saveGame({ character, storyEntries: entries, suggestedChoices })
+    }
+  }, [character, entries, suggestedChoices])
 
   const applyHitPointChange = (delta: number) => {
     setCharacter((current) => {
@@ -39,6 +56,14 @@ function App() {
     })
   }
 
+  const startNewGame = () => {
+    if (!window.confirm('Start a new adventure? This will erase your current character and story.')) return
+    clearGame()
+    setCharacter(null)
+    setEntries([])
+    setSuggestedChoices([])
+  }
+
   if (!character) {
     return <CharacterCreationForm onCreate={setCharacter} />
   }
@@ -46,9 +71,14 @@ function App() {
   return (
     <StoryShell
       character={character}
+      entries={entries}
+      onEntriesChange={setEntries}
+      suggestedChoices={suggestedChoices}
+      onSuggestedChoicesChange={setSuggestedChoices}
       onApplyHitPointChange={applyHitPointChange}
       onApplyLevelUp={applyLevelUp}
       onApplyAlignmentShift={applyAlignmentShift}
+      onStartNewGame={startNewGame}
     />
   )
 }

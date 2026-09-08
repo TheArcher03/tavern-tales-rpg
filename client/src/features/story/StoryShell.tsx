@@ -49,14 +49,27 @@ function formatAlignmentShift(shift: DmAlignmentShift, currentAlignment: Charact
 
 interface StoryShellProps {
   character: Character
+  entries: StoryEntry[]
+  onEntriesChange: (updater: StoryEntry[] | ((current: StoryEntry[]) => StoryEntry[])) => void
+  suggestedChoices: string[]
+  onSuggestedChoicesChange: (choices: string[]) => void
   onApplyHitPointChange: (delta: number) => void
   onApplyLevelUp: (result: DmLevelUpResult) => void
   onApplyAlignmentShift: (shift: DmAlignmentShift) => void
+  onStartNewGame: () => void
 }
 
-export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, onApplyAlignmentShift }: StoryShellProps) {
-  const [entries, setEntries] = useState<StoryEntry[]>([])
-  const [suggestedChoices, setSuggestedChoices] = useState<string[]>([])
+export function StoryShell({
+  character,
+  entries,
+  onEntriesChange,
+  suggestedChoices,
+  onSuggestedChoicesChange,
+  onApplyHitPointChange,
+  onApplyLevelUp,
+  onApplyAlignmentShift,
+  onStartNewGame,
+}: StoryShellProps) {
   const [isLoading, setIsLoading] = useState(false)
   const characterRef = useRef(character)
   characterRef.current = character
@@ -64,10 +77,10 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, o
 
   const performDmTurn = async (playerAction: string, appendPlayerEntry: boolean) => {
     setIsLoading(true)
-    setSuggestedChoices([])
+    onSuggestedChoicesChange([])
 
     if (appendPlayerEntry) {
-      setEntries((current) => [...current, { id: crypto.randomUUID(), speaker: 'player', text: playerAction }])
+      onEntriesChange((current) => [...current, { id: crypto.randomUUID(), speaker: 'player', text: playerAction }])
     }
 
     try {
@@ -76,7 +89,7 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, o
         storyLog: entries,
         playerAction,
       })
-      setEntries((current) => {
+      onEntriesChange((current) => {
         const next = [...current]
         if (result.checkResult) {
           next.push({ id: crypto.randomUUID(), speaker: 'system', text: formatCheckResult(result.checkResult) })
@@ -98,7 +111,7 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, o
         next.push({ id: crypto.randomUUID(), speaker: 'dm', text: result.narration })
         return next
       })
-      setSuggestedChoices(result.suggestedChoices)
+      onSuggestedChoicesChange(result.suggestedChoices)
       if (result.hitPointChange) {
         onApplyHitPointChange(result.hitPointChange.delta)
       }
@@ -110,7 +123,7 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, o
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'The Dungeon Master could not be reached.'
-      setEntries((current) => [...current, { id: crypto.randomUUID(), speaker: 'system', text: message }])
+      onEntriesChange((current) => [...current, { id: crypto.randomUUID(), speaker: 'system', text: message }])
     } finally {
       setIsLoading(false)
     }
@@ -118,8 +131,9 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, o
 
   useEffect(() => {
     // Guards against StrictMode's dev-only double-invoke of mount effects —
-    // each call here is a real, billable DM turn.
-    if (hasStartedRef.current) return
+    // each call here is a real, billable DM turn. Also skips the opening
+    // turn entirely when resuming a saved game (entries already present).
+    if (hasStartedRef.current || entries.length > 0) return
     hasStartedRef.current = true
     void performDmTurn(OPENING_ACTION, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,6 +151,9 @@ export function StoryShell({ character, onApplyHitPointChange, onApplyLevelUp, o
           disabled={isLoading}
         />
         <FreeTextInput onSubmit={(text) => void performDmTurn(text, true)} disabled={isLoading} />
+        <button type="button" className="story-shell__new-game" onClick={onStartNewGame} disabled={isLoading}>
+          Start a new adventure
+        </button>
       </main>
     </div>
   )

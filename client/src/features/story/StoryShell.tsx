@@ -1,157 +1,84 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import {
-  alignmentLabel,
-  shiftAlignment,
-  type Character,
-  type DmAlignmentShift,
-  type DmCheckResult,
-  type DmLevelUpResult,
+  ACTIVE_CAMPAIGN,
+  isChoiceAvailable,
+  resolveChoice,
+  resolveEncounterChoice,
+  type Choice,
+  type ChoiceOutcome,
+  type EncounterChoice,
+  type PartyState,
   type StoryEntry,
 } from '@tavern-tales/shared'
-import { CharacterSheet } from './CharacterSheet'
+import { PartyPanel } from './PartyPanel'
 import { StoryLog } from './StoryLog'
 import { ChoiceButtons } from './ChoiceButtons'
-import { FreeTextInput } from './FreeTextInput'
-import { requestDmTurn } from './dmClient'
 import './StoryShell.css'
 
-const OPENING_ACTION = '(The adventure begins. Set the opening scene.)'
-
-function formatCheckResult(check: DmCheckResult): string {
-  const label = check.checkType === 'attack' ? 'Attack roll' : `${check.skill ?? check.ability} check`
-  const target = check.checkType === 'attack' ? 'AC' : 'DC'
-  const outcome = check.checkType === 'attack' ? (check.success ? 'Hit!' : 'Miss.') : check.success ? 'Success!' : 'Failure.'
-  const signedModifier = check.modifier >= 0 ? `+${check.modifier}` : `${check.modifier}`
-  return `🎲 ${label}: rolled ${check.roll} ${signedModifier} = ${check.total} vs ${target} ${check.dc} — ${outcome}`
-}
-
-function formatLevelUpResult(levelUp: DmLevelUpResult, characterName: string): string {
-  const skillNote = levelUp.newSkillProficiency ? `, gained proficiency in ${levelUp.newSkillProficiency}` : ''
-  return (
-    `⭐ Level up! ${characterName} reaches level ${levelUp.newLevel} — ` +
-    `+${levelUp.hitPointsGained} max HP, proficiency bonus +${levelUp.newProficiencyBonus}${skillNote}.`
-  )
-}
-
-function formatAlignmentShift(shift: DmAlignmentShift, currentAlignment: Character['alignment']): string {
-  const parts: string[] = []
-  if (shift.moralDelta) {
-    parts.push(`${shift.moralDelta > 0 ? '+' : ''}${shift.moralDelta} moral (toward ${shift.moralDelta > 0 ? 'good' : 'evil'})`)
-  }
-  if (shift.ethicalDelta) {
-    parts.push(
-      `${shift.ethicalDelta > 0 ? '+' : ''}${shift.ethicalDelta} ethical (toward ${shift.ethicalDelta > 0 ? 'lawful' : 'chaotic'})`,
-    )
-  }
-  const newAlignment = shiftAlignment(currentAlignment, shift.moralDelta, shift.ethicalDelta)
-  return `⚖️ Alignment shifts ${parts.join(', ')} — ${shift.reason}. Now: ${alignmentLabel(newAlignment)}.`
-}
-
 interface StoryShellProps {
-  character: Character
+  party: PartyState
+  onPartyChange: (updater: PartyState | ((current: PartyState) => PartyState)) => void
   entries: StoryEntry[]
   onEntriesChange: (updater: StoryEntry[] | ((current: StoryEntry[]) => StoryEntry[])) => void
-  suggestedChoices: string[]
-  onSuggestedChoicesChange: (choices: string[]) => void
-  onApplyHitPointChange: (delta: number) => void
-  onApplyLevelUp: (result: DmLevelUpResult) => void
-  onApplyAlignmentShift: (shift: DmAlignmentShift) => void
   onStartNewGame: () => void
 }
 
-export function StoryShell({
-  character,
-  entries,
-  onEntriesChange,
-  suggestedChoices,
-  onSuggestedChoicesChange,
-  onApplyHitPointChange,
-  onApplyLevelUp,
-  onApplyAlignmentShift,
-  onStartNewGame,
-}: StoryShellProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const characterRef = useRef(character)
-  characterRef.current = character
+export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onStartNewGame }: StoryShellProps) {
   const hasStartedRef = useRef(false)
-
-  const performDmTurn = async (playerAction: string, appendPlayerEntry: boolean) => {
-    setIsLoading(true)
-    onSuggestedChoicesChange([])
-
-    if (appendPlayerEntry) {
-      onEntriesChange((current) => [...current, { id: crypto.randomUUID(), speaker: 'player', text: playerAction }])
-    }
-
-    try {
-      const result = await requestDmTurn({
-        character: characterRef.current,
-        storyLog: entries,
-        playerAction,
-      })
-      onEntriesChange((current) => {
-        const next = [...current]
-        if (result.checkResult) {
-          next.push({ id: crypto.randomUUID(), speaker: 'system', text: formatCheckResult(result.checkResult) })
-        }
-        if (result.levelUpResult) {
-          next.push({
-            id: crypto.randomUUID(),
-            speaker: 'system',
-            text: formatLevelUpResult(result.levelUpResult, characterRef.current.name),
-          })
-        }
-        if (result.alignmentShift) {
-          next.push({
-            id: crypto.randomUUID(),
-            speaker: 'system',
-            text: formatAlignmentShift(result.alignmentShift, characterRef.current.alignment),
-          })
-        }
-        next.push({ id: crypto.randomUUID(), speaker: 'dm', text: result.narration })
-        return next
-      })
-      onSuggestedChoicesChange(result.suggestedChoices)
-      if (result.hitPointChange) {
-        onApplyHitPointChange(result.hitPointChange.delta)
-      }
-      if (result.levelUpResult) {
-        onApplyLevelUp(result.levelUpResult)
-      }
-      if (result.alignmentShift) {
-        onApplyAlignmentShift(result.alignmentShift)
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'The Dungeon Master could not be reached.'
-      onEntriesChange((current) => [...current, { id: crypto.randomUUID(), speaker: 'system', text: message }])
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const scene = ACTIVE_CAMPAIGN[party.currentSceneId]
 
   useEffect(() => {
-    // Guards against StrictMode's dev-only double-invoke of mount effects —
-    // each call here is a real, billable DM turn. Also skips the opening
-    // turn entirely when resuming a saved game (entries already present).
+    // Guards against StrictMode's dev-only double-invoke of mount effects,
+    // and skips re-seeding the log when resuming a saved game.
     if (hasStartedRef.current || entries.length > 0) return
     hasStartedRef.current = true
-    void performDmTurn(OPENING_ACTION, false)
+    onEntriesChange([{ id: crypto.randomUUID(), speaker: 'dm', text: scene.narration }])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const applyOutcome = (choiceLabel: string, outcome: ChoiceOutcome, checkLog?: string) => {
+    const nextScene = ACTIVE_CAMPAIGN[outcome.nextSceneId]
+    onEntriesChange((current) => {
+      const next: StoryEntry[] = [...current, { id: crypto.randomUUID(), speaker: 'player', text: choiceLabel }]
+      if (checkLog) next.push({ id: crypto.randomUUID(), speaker: 'system', text: checkLog })
+      for (const log of outcome.logs) next.push({ id: crypto.randomUUID(), speaker: 'system', text: log })
+      if (nextScene.type === 'ending') {
+        next.push({ id: crypto.randomUUID(), speaker: 'system', text: `🏁 ${nextScene.title}` })
+      }
+      next.push({ id: crypto.randomUUID(), speaker: 'dm', text: nextScene.narration })
+      return next
+    })
+    onPartyChange({ ...outcome.party, currentSceneId: outcome.nextSceneId })
+  }
+
+  const handleChoice = (choice: Choice) => applyOutcome(choice.label, resolveChoice(party, choice))
+
+  const handleEncounterChoice = (choice: EncounterChoice) => {
+    const outcome = resolveEncounterChoice(party, choice)
+    applyOutcome(choice.label, outcome, outcome.checkLog)
+  }
+
+  const availableChoices = scene.type === 'ending' ? [] : scene.choices.filter((choice) => isChoiceAvailable(party, choice.condition))
+
   return (
     <div className="story-shell">
-      <CharacterSheet character={character} />
+      <PartyPanel party={party} />
       <main className="story-shell__main">
         <StoryLog entries={entries} />
-        {isLoading && <p className="story-shell__loading">The Dungeon Master is thinking…</p>}
-        <ChoiceButtons
-          choices={suggestedChoices}
-          onChoose={(choice) => void performDmTurn(choice, true)}
-          disabled={isLoading}
-        />
-        <FreeTextInput onSubmit={(text) => void performDmTurn(text, true)} disabled={isLoading} />
-        <button type="button" className="story-shell__new-game" onClick={onStartNewGame} disabled={isLoading}>
+        {scene.type === 'ending' ? (
+          <p className="story-shell__ending-note">The story ends here.</p>
+        ) : (
+          <ChoiceButtons
+            choices={availableChoices.map((choice) => choice.label)}
+            onChoose={(label) => {
+              const choice = availableChoices.find((candidate) => candidate.label === label)
+              if (!choice) return
+              if (scene.type === 'encounter') handleEncounterChoice(choice as EncounterChoice)
+              else handleChoice(choice as Choice)
+            }}
+          />
+        )}
+        <button type="button" className="story-shell__new-game" onClick={onStartNewGame}>
           Start a new adventure
         </button>
       </main>

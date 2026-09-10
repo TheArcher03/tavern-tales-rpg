@@ -1,10 +1,13 @@
 import { ABILITY_NAMES, abilityModifier, proficiencyBonusForLevel, type AbilityName, type AbilityScores } from './abilities.js'
 import type { Alignment } from './alignment.js'
+import type { Curse } from './curse.js'
 import { validatePointBuy } from './pointBuy.js'
 import { getRace } from './race.js'
 import { getCharacterClass } from './characterClass.js'
 import { getBackground } from './background.js'
 import type { SkillName } from './skills.js'
+
+export type CharacterRole = 'player' | 'companion'
 
 export interface Character {
   id: string
@@ -25,6 +28,10 @@ export interface Character {
   skillProficiencies: SkillName[]
   /** Starts at True Neutral (0, 0); shifts through story choices. */
   alignment: Alignment
+  /** Afflictions are personal, not party-shared. */
+  curses: Curse[]
+  /** Player-created vs. CPU-generated party member. Defaults to 'player'. */
+  role: CharacterRole
 }
 
 export interface CreateCharacterInput {
@@ -73,5 +80,7 @@ export function createCharacter(input: CreateCharacterInput): Character {
     armorClass: 10 + abilityModifiers.DEX,
     skillProficiencies: [...background.skillProficiencies],
     alignment: { moral: 0, ethical: 0 },
+    curses: [],
+    role: 'player',
   }
 }

@@ -134,3 +134,99 @@
   cursor: default;
   opacity: 0.5;
 }
+
+.story-shell__ending-note {
+  font-style: italic;
+  color: #6b6375;
+}
+
+.party-panel {
+  width: 18rem;
+  flex-shrink: 0;
+  padding: 1.5rem;
+  border-right: 1px solid #e5e4e7;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.party-panel__member {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e4e7;
+}
+
+.party-panel__member:last-of-type {
+  border-bottom: none;
+}
+
+.party-panel__member-name {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.party-panel__companion-tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b6375;
+  border: 1px solid #e5e4e7;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.3rem;
+}
+
+.party-panel__member-subtitle {
+  margin: 0.1rem 0;
+  color: #6b6375;
+  font-size: 0.85rem;
+}
+
+.party-panel__member-alignment {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #aa3bff;
+}
+
+.party-panel__member-stats {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.party-panel__member-stats dt {
+  font-size: 0.7rem;
+  color: #6b6375;
+}
+
+.party-panel__member-stats dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.party-panel__curses {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+}
+
+.party-panel__treasury {
+  margin-top: auto;
+}
+
+.party-panel__gold {
+  font-weight: 600;
+}
+
+.party-panel__treasure {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}

@@ -1,27 +1,23 @@
-import type { Character, StoryEntry } from '@tavern-tales/shared'
+import type { PartyState, StoryEntry } from '@tavern-tales/shared'
 
 const STORAGE_KEY = 'tavern-tales:save'
 
 export interface GameSave {
-  character: Character
+  party: PartyState
   storyEntries: StoryEntry[]
-  suggestedChoices: string[]
 }
 
 function isGameSave(value: unknown): value is GameSave {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Partial<GameSave>
-  return (
-    typeof candidate.character === 'object' &&
-    candidate.character !== null &&
-    Array.isArray(candidate.storyEntries) &&
-    Array.isArray(candidate.suggestedChoices)
-  )
+  return typeof candidate.party === 'object' && candidate.party !== null && Array.isArray(candidate.storyEntries)
 }
 
 // A single save slot is enough to let a campaign survive a refresh — the
 // simplest thing that makes "campaign" true. Named/multiple saves would be
-// a natural follow-up but aren't required for that.
+// a natural follow-up but aren't required for that. A save from the old
+// single-character live-DM mode won't match isGameSave and is treated as
+// no save at all, which is the right fallback for this new game mode.
 export function loadGame(): GameSave | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)

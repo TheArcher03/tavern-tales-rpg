@@ -3,8 +3,8 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Stage 8 complete — save/load persistence, verified live end to end
-Date: 2026-08-19
+## Status: Campaign engine + expanded Act 1 content built and verified live; Act 2 not yet written
+Date: 2026-09-10
 
 ## Tech stack (decided)
 - **Client**: Vite + React + TypeScript (`client/`)
@@ -476,14 +476,19 @@ single discrete milestone) and Stage 10 (a modding/scripting layer,
 explicitly called out as future work in the README, not required for
 playability).
 
-## Next up (Stage 9): polish, balancing, playtesting
+## Next up (Stage 9): polish, balancing, playtesting — for the live-DM mode
+The items below were written for the live-LLM-DM game (Stages 4–8). That
+mode is **no longer the app's default** as of the static campaign engine
+below (still in the repo, dormant, not deleted) — these notes are kept for
+if/when that mode gets revisited, not as active next steps.
 - Unlike Stages 1–8, this isn't a single feature to build — it's an
   open-ended pass. Concrete, scoped candidates to pick from rather than
   a single mandatory next step:
   - **Content breadth**: `shared/`'s race/class/background data is still
     a deliberately small starter set (4 races, 4 classes, 4 backgrounds)
     from Stage 2 — expanding toward the full SRD 5.1 list is pure data
-    entry, no architecture change needed.
+    entry, no architecture change needed. (This part is still relevant to
+    the new campaign engine too, since it reuses the same data.)
   - **Balancing**: no actual playtesting has happened beyond short,
     deliberately-engineered test scenarios to verify each mechanic works.
     Longer real sessions would surface whether DC/damage/level-up
@@ -500,6 +505,217 @@ playability).
     once the mechanics underneath are this far along.
 - Loose end from Stage 4, still unresolved: the `/api/hello` route from
   Stage 1 is still there, unused by the real app.
+
+## Static "Choices"-style campaign engine (new — supersedes the live DM as the default experience)
+The user wanted a version that costs nothing to run and gives full
+narrative control: an authored branching campaign (no free-text box, no
+per-turn API cost) played by a 4-person party — 2 player-created characters
+plus 2 CPU-generated companions who level up alongside them — with
+decision-driven encounters, loot, curses, and multiple endings, plus side
+quests that loop back into the main branches. The user supplied a
+published D&D module (*Hoard of the Dragon Queen*) as structural reference;
+confirmed with them this means original setting/NPCs/plot mirroring its
+3-act escalation shape, not reusing the module's own copyrighted content
+(it's commercial WotC IP, outside the SRD 5.1 license this project already
+relies on for rules). Full design plan: `~/.claude/plans/playful-mapping-hopper.md`.
+
+**This is additive, not a replacement of prior work**: the live-DM system
+(`server/`, `client/src/features/story/dmClient.ts`, `FreeTextInput.tsx`,
+the old single-character `CharacterSheet.tsx`) stays in the repo exactly as
+built in Stages 4–8, just unused by the new default flow — confirmed with
+the user as the preferred approach (reversible via git either way, but no
+reason to delete working code).
+
+### What's built (engine only — no real story content yet)
+- **`shared/src/campaign/types.ts`** — the content model: `Scene` is a
+  discriminated union of `NarrationScene` (choices → next scene id, with
+  optional `effects` and a `condition` for gating a choice on a story
+  flag), `EncounterScene` (choices are approaches resolved via a real
+  `resolveCheck` roll against the monster's stats, branching to a distinct
+  success/failure scene — **abstracted, not round-by-round tactical
+  combat**, confirmed with the user as the right scope), and `EndingScene`.
+  A `Campaign` is `Record<string, Scene>` — a **graph**, not a strict tree,
+  since a side quest's ending scene(s) just point back at a main-branch
+  scene id. `SceneEffect` is a discriminated union covering everything a
+  choice can do: grant gold/an item/a curse, remove a curse, change HP,
+  shift alignment, trigger a level-up, or set a story flag — each targets
+  a `PartySlot` (`'pc1' | 'pc2' | 'companion1' | 'companion2'`), `'party'`
+  (all four), or `'random'`.
+- **`shared/src/item.ts`**, **`shared/src/curse.ts`** — small standalone
+  types (not nested under `campaign/`, since they're general
+  character/party concepts, not campaign-authoring-specific — avoids
+  `character.ts` needing to depend on the campaign feature).
+- **`shared/src/character.ts`** — `Character` gained `curses: Curse[]`
+  (afflictions are personal, not party-shared) and `role: 'player' |
+  'companion'`, both defaulted by `createCharacter`.
+- **`shared/src/campaign/companion.ts`** — `generateCompanion()`: fills
+  whichever of the 4 core classes isn't already covered by the player's 2
+  picks (falls back to any class if all 4 are covered, confirmed with the
+  user as the preferred "complementary" approach over fully random), then
+  spends the full 27-point buy budget with a simple greedy allocator
+  weighted toward that class's primary abilities, then calls
+  `createCharacter` — the exact same validated path a player character
+  goes through.
+- **`shared/src/campaign/partyState.ts`** — `PartyState { members: [4
+  Characters, fixed pc1/pc2/companion1/companion2 order], sharedGold,
+  sharedTreasure, storyFlags, currentSceneId }` — the entire game state.
+- **`shared/src/campaign/engine.ts`** — the resolution logic, all pure
+  functions: `applyEffect`/`applyEffects` (mutates party state immutably
+  per effect, returns a player-facing log line for each — mirrors the
+  formatting the old live-DM `StoryShell` used for check/level-up/
+  alignment results, just resolved locally instead of from a server
+  response), `isChoiceAvailable` (story-flag gating), `resolveChoice`
+  (applies a narration choice's effects, returns the next scene id), and
+  `resolveEncounterChoice` (resolves the actor's `resolveCheck` roll,
+  applies success or failure effects, branches accordingly). Every dice
+  roll reuses `resolveCheck`/`resolveLevelUp`/`shiftAlignment` from
+  Stages 5–7 unchanged — no new game math, just a new place to call it
+  from (client-side instead of a server route).
+- **`shared/src/campaign/prototype.ts`** + **`activeCampaign.ts`** — a
+  small throwaway scene set (a branch, an encounter with two approaches, a
+  level-up trigger, gold, HP loss, three endings) used only to verify the
+  engine end-to-end; `ACTIVE_CAMPAIGN`/`CAMPAIGN_START_SCENE_ID` are the
+  only things the client ever imports, so swapping in the real acts later
+  is a one-line change in `activeCampaign.ts`, nothing else touches it.
+- **`client/src/features/party/PartyCreation.tsx`** — new flow: create
+  player character 1 → create player character 2 → auto-generate and
+  reveal the 2 companions → begin. Reuses `CharacterCreationForm` twice.
+  **Bug found and fixed during live testing**: without a distinct `key`
+  prop on each `CharacterCreationForm` instance, React reused the same
+  component instance across the two steps (same type, same tree position),
+  so character 2's form silently inherited character 1's leftover ability
+  scores instead of resetting to defaults. Fixed with `key="pc1"` /
+  `key="pc2"`; confirmed live afterward that character 2 correctly starts
+  fresh.
+- **`client/src/features/story/PartyPanel.tsx`** — replaces
+  `CharacterSheet.tsx` in the sidebar (that file is left in place, unused,
+  matching the "keep dormant" treatment above): compact cards for all 4
+  members (name, companion tag, level/race/class, alignment, HP/AC/prof,
+  curses) plus shared gold/treasure.
+- **`client/src/features/story/StoryShell.tsx`** rewritten: renders the
+  current scene's narration + choices (filtered by `isChoiceAvailable`)
+  via the unchanged `StoryLog`/`ChoiceButtons`; on choice, calls
+  `resolveChoice`/`resolveEncounterChoice`, appends the resulting logs +
+  next scene's narration to the entry log, and advances
+  `party.currentSceneId` — synchronous, no network call, no loading state.
+  `FreeTextInput` removed from the render tree (file left in place,
+  unused).
+- **`client/src/features/persistence/gameSave.ts`** — now persists
+  `{ party: PartyState, storyEntries }` instead of a single `Character` +
+  suggested choices (no longer needed — choices are always derivable from
+  `currentSceneId` + `storyFlags`). An old save from the live-DM mode
+  fails the new shape check and is treated as no save, which is the
+  correct fallback for this new mode.
+- 14 new unit tests (`companion.test.ts`, `engine.test.ts`) — shared suite
+  is now 51/51. Fixed the shared test script too: it was globbing only
+  `src/*.test.ts`, silently skipping subdirectories — now globs
+  `src/*.test.ts src/campaign/*.test.ts` explicitly.
+- Verified live end to end in the browser: created a Fighter+Rogue party,
+  confirmed companions correctly filled Wizard+Cleric, walked the opening
+  branch into the encounter, tried both encounter approaches (both failed
+  the roll live, correctly applying HP loss and branching to the losing
+  scene — the success branch and its `levelUp` effect are covered by the
+  deterministic unit tests and share the identical rendering code path
+  already confirmed live), reached an ending with no choices offered,
+  refreshed mid-game and got the exact same state back with **no server
+  call at all**, and confirmed "Start a new adventure" resets cleanly.
+
+### What's built — Act 1: "Ash Over Millhaven"
+Original story (confirmed with the user: mirrors the *structural* beat of
+a settlement raided by an organized hostile force, none of the specific
+plot/names/content from the reference module). `shared/src/campaign/act1.ts`,
+**41 scenes**, wired up as `ACTIVE_CAMPAIGN` in `activeCampaign.ts` (the
+`start`-scene id is `act1-start`).
+
+- **Pacing note**: the user's target is roughly **2+ hours total** to play
+  all acts. The first draft of Act 1 (17 scenes, ~8-scene played path) was
+  far too short for a ~40-45 minute per-act share — estimated only
+  6-12 minutes of real playtime. Act 1 was expanded to 41 scenes before
+  being called done: each of the three opening approaches now has its own
+  follow-up complication/rescue scene (not just a single check), and the
+  post-raid section is a **hub-and-spoke investigation** (see below)
+  instead of one optional side quest, roughly quadrupling the played-path
+  length to ~16-20 scene transitions depending on how many hub spokes the
+  player takes (~15-25 real minutes) — still likely light of a full 40-45
+  minute share on its own, but a large step up, with the remaining gap
+  expected to close across Acts 2-3's own expansion and the side quests
+  still to come. See `project-campaign-target-length` memory for the
+  original estimate this was scoped against.
+- **Setting**: Millhaven, a river-trade town on the edge of the Thornwood.
+  Raided at night by "the Ashen Circle," a cult after a ward-relic (the
+  Cinderseal) kept by the town's herbalist, Old Sella — both are taken.
+  A captain named Vesh and a name the party overhears but doesn't yet
+  understand — "waking Umbrask" — seed Act 2/3's throughline.
+- **Structure**: three opening approaches (charge the granary / spy from
+  the rooftops / rally the militia) — each an `EncounterScene`, and each
+  now followed by its own distinct complication scene regardless of
+  success or failure on the first check (a trapped child in the granary
+  fire, a second raider column to optionally shadow toward the Thornwood
+  after spying, a riverside evacuation after rallying the militia) — all
+  eventually converge on one `act1-raiders-retreat` scene. From there, an
+  **investigation hub** (`act1-hub`) offers up to **four optional
+  spokes** — interrogate a wounded raider, tend the town's wounded, search
+  Old Sella's ransacked cottage, or check on the miller — each gated by
+  its own story flag (`SceneCondition`, the engine's condition-gating
+  exercised for the first time in real content) so a completed spoke
+  disappears from the hub instead of being repeatable, and each loops back
+  to the hub afterward. This is the concrete "side quests that loop back"
+  mechanic the user asked for, done four times instead of once. Two spokes
+  can fail their check into a **curse** ("Ashmark", "Wardburn") instead of
+  their reward; the interrogation spoke's success sets `knowsRaiderCamp`
+  for Act 2 to check later. The player can leave the hub at any time via
+  "Enough — set out after the trail now," so none of the four spokes are
+  mandatory. From there, the milestone scene triggers `levelUp` targeting
+  `'party'` (all four members level up together, each with their own
+  hit-die roll), then hands off to a **temporary stub ending scene**
+  (`act1-end`) standing in for Act 2's real opening.
+- **`shared/src/campaign/validate.ts`** (new, not in the original plan —
+  added once real content existed to actually need it): `findCampaignErrors`
+  (dangling `next`/`successNext`/`failureNext` references, empty choice
+  lists, mismatched scene ids) and `findUnreachableScenes` (graph traversal
+  from the start scene). `act1.test.ts` asserts Act 1 passes both, plus
+  has exactly one ending (the stub) — this becomes the standard check for
+  every future act and for the final merged campaign, catching broken
+  links automatically instead of requiring a manual click-through of every
+  path.
+- **Bug found and fixed**: an old save from before Act 1 existed (or from
+  a later act replacing an earlier one down the line) could reference a
+  `currentSceneId` no longer present in `ACTIVE_CAMPAIGN`, which would
+  crash the app on load (`ACTIVE_CAMPAIGN[missingId].narration` on
+  `undefined`). `App.tsx` now checks this on load
+  (`resolveInitialSave()`) and discards the stale save instead of
+  crashing — worth remembering this matters again every time
+  `ACTIVE_CAMPAIGN` changes, which will be at least twice more (Act 2, Act 3).
+- 7 new unit tests (`validate.test.ts`, `act1.test.ts`) — shared suite is
+  now 61/61, all still passing against the expanded 41-scene version.
+- Verified live end to end in the browser (expanded version): full
+  playthrough of the granary-fight → rescue path, all four hub spokes in
+  sequence (confirming each spoke's story flag correctly hides it from the
+  hub after completion, including one deliberately-failed check that
+  correctly applied a curse to the acting character), the milestone
+  level-up (all four party members to Level 2, each with an independently
+  rolled HP gain), departure, and the `act1-end` stub — with zero console
+  errors throughout.
+- `.claude/launch.json` added (client dev server, port 5173) so future
+  sessions can preview the app via the Browser tool without recreating it.
+
+## Next up: Act 2
+Per the agreed delivery sequence:
+1. **Act 2** (mirrors "track the raiders back to their camp") — should
+   check the `knowsRaiderCamp` flag Act 1 already sets (from the
+   interrogation side quest) to offer a shortcut/bonus path; needs a
+   second side quest that also loops back into its main branch. Replaces
+   `act1-end` as Act 1's real handoff point (the stub's id, `act1-end`,
+   should become Act 2's first scene id, or Act 1's milestone scene should
+   point at Act 2's real first scene — either way, `findCampaignErrors`/
+   `findUnreachableScenes` against the merged campaign will catch it if
+   this is done wrong).
+2. Act 3 (climax — presumably where "waking Umbrask" pays off) + 3–4
+   distinct endings.
+3. Wire remaining side quests, full playthrough pass, replace
+   `PROTOTYPE_CAMPAIGN` usage in tests if desired (or keep it as the
+   engine fixture — it's not part of the shipped campaign either way),
+   update `activeCampaign.ts` to merge all three acts.
 
 ## Notes for future sessions / continuity
 - This file should be updated at the end of every work session with what

@@ -1,0 +1,34 @@
+.party-creation {
+  max-width: 32rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+  font-family: system-ui, sans-serif;
+}
+
+.party-creation__step {
+  color: #6b6375;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: -0.5rem;
+}
+
+.party-creation__reveal {
+  text-align: center;
+}
+
+.party-creation__roster {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  text-align: left;
+}
+
+.party-creation__roster li {
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e4e7;
+  border-radius: 0.5rem;
+}

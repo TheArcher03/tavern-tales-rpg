@@ -1,83 +1,57 @@
 import { useEffect, useState } from 'react'
-import {
-  shiftAlignment,
-  type Character,
-  type DmAlignmentShift,
-  type DmLevelUpResult,
-  type StoryEntry,
-} from '@tavern-tales/shared'
-import { CharacterCreationForm } from './features/characterCreation/CharacterCreationForm'
+import { ACTIVE_CAMPAIGN, CAMPAIGN_START_SCENE_ID, type PartyState, type StoryEntry } from '@tavern-tales/shared'
+import { PartyCreation } from './features/party/PartyCreation'
 import { StoryShell } from './features/story/StoryShell'
-import { clearGame, loadGame, saveGame } from './features/persistence/gameSave'
+import { clearGame, loadGame, saveGame, type GameSave } from './features/persistence/gameSave'
 
-const savedGame = loadGame()
+// A save's currentSceneId can point at a scene that no longer exists in
+// ACTIVE_CAMPAIGN — most commonly right after swapping in a new/later act.
+// Treat that the same as "no save" rather than crashing on an unknown scene.
+function resolveInitialSave(): GameSave | null {
+  const save = loadGame()
+  if (save && !ACTIVE_CAMPAIGN[save.party.currentSceneId]) {
+    clearGame()
+    return null
+  }
+  return save
+}
+
+const savedGame = resolveInitialSave()
 
 function App() {
-  const [character, setCharacter] = useState<Character | null>(savedGame?.character ?? null)
+  const [party, setParty] = useState<PartyState | null>(savedGame?.party ?? null)
   const [entries, setEntries] = useState<StoryEntry[]>(savedGame?.storyEntries ?? [])
-  const [suggestedChoices, setSuggestedChoices] = useState<string[]>(savedGame?.suggestedChoices ?? [])
 
   useEffect(() => {
-    if (character) {
-      saveGame({ character, storyEntries: entries, suggestedChoices })
+    if (party) {
+      saveGame({ party, storyEntries: entries })
     }
-  }, [character, entries, suggestedChoices])
-
-  const applyHitPointChange = (delta: number) => {
-    setCharacter((current) => {
-      if (!current) return current
-      const nextCurrent = Math.max(0, Math.min(current.hitPoints.max, current.hitPoints.current + delta))
-      return { ...current, hitPoints: { ...current.hitPoints, current: nextCurrent } }
-    })
-  }
-
-  const applyLevelUp = (result: DmLevelUpResult) => {
-    setCharacter((current) => {
-      if (!current) return current
-      const nextMax = current.hitPoints.max + result.hitPointsGained
-      const skillProficiencies =
-        result.newSkillProficiency && !current.skillProficiencies.includes(result.newSkillProficiency)
-          ? [...current.skillProficiencies, result.newSkillProficiency]
-          : current.skillProficiencies
-      return {
-        ...current,
-        level: result.newLevel,
-        proficiencyBonus: result.newProficiencyBonus,
-        hitPoints: { max: nextMax, current: current.hitPoints.current + result.hitPointsGained },
-        skillProficiencies,
-      }
-    })
-  }
-
-  const applyAlignmentShift = (shift: DmAlignmentShift) => {
-    setCharacter((current) => {
-      if (!current) return current
-      return { ...current, alignment: shiftAlignment(current.alignment, shift.moralDelta, shift.ethicalDelta) }
-    })
-  }
+  }, [party, entries])
 
   const startNewGame = () => {
-    if (!window.confirm('Start a new adventure? This will erase your current character and story.')) return
+    if (!window.confirm('Start a new adventure? This will erase your current party and story.')) return
     clearGame()
-    setCharacter(null)
+    setParty(null)
     setEntries([])
-    setSuggestedChoices([])
   }
 
-  if (!character) {
-    return <CharacterCreationForm onCreate={setCharacter} />
+  const updateParty = (updater: PartyState | ((current: PartyState) => PartyState)) => {
+    setParty((current) => {
+      if (!current) return current
+      return typeof updater === 'function' ? updater(current) : updater
+    })
+  }
+
+  if (!party) {
+    return <PartyCreation startingSceneId={CAMPAIGN_START_SCENE_ID} onReady={setParty} />
   }
 
   return (
     <StoryShell
-      character={character}
+      party={party}
+      onPartyChange={updateParty}
       entries={entries}
       onEntriesChange={setEntries}
-      suggestedChoices={suggestedChoices}
-      onSuggestedChoicesChange={setSuggestedChoices}
-      onApplyHitPointChange={applyHitPointChange}
-      onApplyLevelUp={applyLevelUp}
-      onApplyAlignmentShift={applyAlignmentShift}
       onStartNewGame={startNewGame}
     />
   )

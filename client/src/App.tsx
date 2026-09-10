@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ACTIVE_CAMPAIGN, CAMPAIGN_START_SCENE_ID, type PartyState, type StoryEntry } from '@tavern-tales/shared'
 import { PartyCreation } from './features/party/PartyCreation'
+import { TitleScreen } from './features/party/TitleScreen'
 import { StoryShell } from './features/story/StoryShell'
 import { clearGame, loadGame, saveGame, type GameSave } from './features/persistence/gameSave'
 
@@ -21,6 +22,7 @@ const savedGame = resolveInitialSave()
 function App() {
   const [party, setParty] = useState<PartyState | null>(savedGame?.party ?? null)
   const [entries, setEntries] = useState<StoryEntry[]>(savedGame?.storyEntries ?? [])
+  const [showTitleScreen, setShowTitleScreen] = useState(true)
 
   useEffect(() => {
     if (party) {
@@ -33,6 +35,7 @@ function App() {
     clearGame()
     setParty(null)
     setEntries([])
+    setShowTitleScreen(true)
   }
 
   const updateParty = (updater: PartyState | ((current: PartyState) => PartyState)) => {
@@ -43,6 +46,9 @@ function App() {
   }
 
   if (!party) {
+    if (showTitleScreen) {
+      return <TitleScreen onBegin={() => setShowTitleScreen(false)} />
+    }
     return <PartyCreation startingSceneId={CAMPAIGN_START_SCENE_ID} onReady={setParty} />
   }
 

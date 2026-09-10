@@ -6,16 +6,15 @@ import { POINT_BUY_BUDGET, POINT_BUY_MAX_SCORE, POINT_BUY_MIN_SCORE, pointBuyCos
 import { RACES } from '../race.js'
 
 // Rough "primary abilities" per class, used only to weight CPU allocation —
-// not a mechanical rule, just a flavor heuristic. Also reused by
-// autoAssignCompanionAbilityIncrease (engine.ts) to pick a level-up ability.
-export const CLASS_PRIORITY_ABILITIES: Record<string, AbilityName[]> = {
+// not a mechanical rule, just a flavor heuristic.
+const CLASS_PRIORITY_ABILITIES: Record<string, AbilityName[]> = {
   fighter: ['STR', 'CON'],
   wizard: ['INT', 'CON'],
   rogue: ['DEX', 'INT'],
   cleric: ['WIS', 'CON'],
 }
 
-export function pickRandom<T>(items: readonly T[], random: () => number): T {
+function pickRandom<T>(items: readonly T[], random: () => number): T {
   return items[Math.floor(random() * items.length)]
 }
 

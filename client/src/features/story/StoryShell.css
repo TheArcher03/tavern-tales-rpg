@@ -146,7 +146,14 @@
   flex: 1;
 }
 
-.story-shell__new-game {
+.story-shell__footer-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.story-shell__new-game,
+.story-shell__skills-toggle {
   align-self: flex-start;
   background: none;
   border: none;
@@ -157,7 +164,8 @@
   cursor: pointer;
 }
 
-.story-shell__new-game:hover:not(:disabled) {
+.story-shell__new-game:hover:not(:disabled),
+.story-shell__skills-toggle:hover:not(:disabled) {
   background: none;
   color: var(--color-accent);
 }
@@ -497,4 +505,156 @@
   margin: 0.1rem 0 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
+}
+
+/* Dice roll reveal */
+.dice-roll {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+}
+
+.dice-roll__actor {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.dice-roll__die {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 1rem;
+  border: 2px solid var(--color-border);
+  background: var(--color-bg-panel);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform: rotate(-6deg);
+}
+
+.dice-roll__die--spinning {
+  animation: dice-roll-spin 0.35s linear infinite;
+  color: var(--color-text-muted);
+}
+
+.dice-roll__die--success {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  transform: rotate(0deg) scale(1.08);
+}
+
+.dice-roll__die--failure {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  transform: rotate(0deg) scale(1.08);
+}
+
+@keyframes dice-roll-spin {
+  from {
+    transform: rotate(-6deg) scale(0.95);
+  }
+  50% {
+    transform: rotate(8deg) scale(1.05);
+  }
+  to {
+    transform: rotate(-6deg) scale(0.95);
+  }
+}
+
+.dice-roll__breakdown {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.dice-roll__result {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+}
+
+.dice-roll__result--success {
+  color: var(--color-accent);
+}
+
+.dice-roll__result--failure {
+  color: var(--color-danger);
+}
+
+/* Skills guide */
+.skills-guide__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  z-index: 10;
+}
+
+.skills-guide {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  max-width: 40rem;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.skills-guide__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.skills-guide__header h2 {
+  margin: 0;
+}
+
+.skills-guide__close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.skills-guide__close:hover {
+  background: none;
+  color: var(--color-accent);
+}
+
+.skills-guide__intro {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.skills-guide__list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.skills-guide__entry dt {
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.skills-guide__entry dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
 }

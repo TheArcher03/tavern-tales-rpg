@@ -3,7 +3,6 @@ import {
   ACTIVE_CAMPAIGN,
   SLOT_INDEX,
   applyAbilityIncrease,
-  autoAssignCompanionAbilityIncrease,
   isChoiceAvailable,
   resolveActingMember,
   resolveChoice,
@@ -16,6 +15,7 @@ import {
   type ChoiceOutcome,
   type EncounterChoice,
   type EncounterOutcome,
+  type PartySlot,
   type PartyState,
   type ShopOffer,
   type StoryEntry,
@@ -26,6 +26,8 @@ import { ChoiceButtons } from './ChoiceButtons'
 import { StoryInterstitial } from './StoryInterstitial'
 import { LevelUpChoice } from './LevelUpChoice'
 import { ShopScreen } from './ShopScreen'
+import { DiceRollReveal } from './DiceRollReveal'
+import { SkillsGuide } from './SkillsGuide'
 import './StoryShell.css'
 
 interface StoryShellProps {
@@ -37,13 +39,15 @@ interface StoryShellProps {
 }
 
 // One step that must be shown and dismissed before a scene transition is
-// finalized. Deaths and level-up choices come from the outcome of the
-// choice just made; a chapter break comes from the destination scene.
-// None of this is persisted mid-flight — refreshing during an interstitial
-// loses that one in-flight transition, same as any other unsaved UI action.
+// finalized. A dice roll comes from resolving an encounter choice; deaths
+// and level-up choices come from the outcome of the choice just made; a
+// chapter break comes from the destination scene. None of this is
+// persisted mid-flight — refreshing during an interstitial loses that one
+// in-flight transition, same as any other unsaved UI action.
 type PendingStep =
+  | { kind: 'diceRoll'; actorName: string; checkLabel: string; dc: number; roll: number; modifier: number; total: number; success: boolean }
   | { kind: 'death'; name: string }
-  | { kind: 'levelUp'; slot: 'pc1' | 'pc2' }
+  | { kind: 'levelUp'; slot: PartySlot }
   | { kind: 'chapterBreak'; chapterBreak: ChapterBreak }
 
 interface PendingTransition {
@@ -61,6 +65,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
 
   const [initialChapterBreak, setInitialChapterBreak] = useState<ChapterBreak | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
+  const [showSkillsGuide, setShowSkillsGuide] = useState(false)
 
   useEffect(() => {
     // Guards against StrictMode's dev-only double-invoke of mount effects,
@@ -98,27 +103,23 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
   }
 
   // Builds the pending-steps queue for one resolved choice/encounter
-  // outcome, auto-resolving companion ability increases immediately (no UI
-  // step), then either commits right away (nothing to show) or stages the
-  // transition for the player to work through one step at a time.
-  const beginTransition = (choiceLabel: string, outcome: ChoiceOutcome | EncounterOutcome, checkLog?: string) => {
-    let workingParty = outcome.party
-
-    ;(['companion1', 'companion2'] as const).forEach((slot) => {
-      const index = SLOT_INDEX[slot]
-      if (workingParty.members[index].level > party.members[index].level) {
-        const ability = autoAssignCompanionAbilityIncrease(workingParty.members[index])
-        workingParty = applyAbilityIncrease(workingParty, slot, ability)
-      }
-    })
-
+  // outcome, then either commits right away (nothing to show) or stages
+  // the transition for the player to work through one step at a time. All
+  // four party slots get an interactive level-up choice — none are
+  // auto-assigned.
+  const beginTransition = (
+    choiceLabel: string,
+    outcome: ChoiceOutcome | EncounterOutcome,
+    checkLog?: string,
+    diceRollStep?: PendingStep,
+  ) => {
     const deathSteps: PendingStep[] = outcome.deaths.map((name) => ({ kind: 'death', name }))
 
-    const levelUpSteps: PendingStep[] = (['pc1', 'pc2'] as const)
-      .filter((slot) => workingParty.members[SLOT_INDEX[slot]].level > party.members[SLOT_INDEX[slot]].level)
+    const levelUpSteps: PendingStep[] = (['pc1', 'pc2', 'companion1', 'companion2'] as const)
+      .filter((slot) => outcome.party.members[SLOT_INDEX[slot]].level > party.members[SLOT_INDEX[slot]].level)
       .map((slot) => ({ kind: 'levelUp', slot }))
 
-    const allDead = workingParty.members.every((member) => member.status === 'dead')
+    const allDead = outcome.party.members.every((member) => member.status === 'dead')
     const finalNextSceneId = allDead ? 'party-wiped' : outcome.nextSceneId
     const nextScene = ACTIVE_CAMPAIGN[finalNextSceneId]
     const chapterSteps: PendingStep[] =
@@ -126,14 +127,14 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
         ? [{ kind: 'chapterBreak', chapterBreak: nextScene.chapterBreak }]
         : []
 
-    const steps = [...deathSteps, ...levelUpSteps, ...chapterSteps]
+    const steps = [...(diceRollStep ? [diceRollStep] : []), ...deathSteps, ...levelUpSteps, ...chapterSteps]
 
     if (steps.length === 0) {
-      commitTransition(choiceLabel, workingParty, outcome.logs, finalNextSceneId, checkLog)
+      commitTransition(choiceLabel, outcome.party, outcome.logs, finalNextSceneId, checkLog)
       return
     }
 
-    setPending({ steps, party: workingParty, logs: outcome.logs, choiceLabel, checkLog, nextSceneId: finalNextSceneId })
+    setPending({ steps, party: outcome.party, logs: outcome.logs, choiceLabel, checkLog, nextSceneId: finalNextSceneId })
   }
 
   // Advances past a death or chapter-break step (no data to fold in).
@@ -167,7 +168,19 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
 
   const handleEncounterChoice = (choice: EncounterChoice) => {
     const outcome = resolveEncounterChoice(party, choice)
-    beginTransition(choice.label, outcome, outcome.checkLog)
+    // The real check already happened above — this step only delays
+    // revealing it, so the mechanic itself is unchanged, just dramatized.
+    const diceRollStep: PendingStep = {
+      kind: 'diceRoll',
+      actorName: outcome.actorName,
+      checkLabel: outcome.checkLabel,
+      dc: outcome.check.dc,
+      roll: outcome.check.roll,
+      modifier: outcome.check.modifier,
+      total: outcome.check.total,
+      success: outcome.check.success,
+    }
+    beginTransition(choice.label, outcome, outcome.checkLog, diceRollStep)
   }
 
   const handlePurchase = (offer: ShopOffer) => {
@@ -214,6 +227,18 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
       <div className="story-shell">
         <PartyPanel party={displayParty} onUseItem={handleUseItem} />
         <main className="story-shell__main">
+          {pendingStep.kind === 'diceRoll' && (
+            <DiceRollReveal
+              actorName={pendingStep.actorName}
+              checkLabel={pendingStep.checkLabel}
+              dc={pendingStep.dc}
+              roll={pendingStep.roll}
+              modifier={pendingStep.modifier}
+              total={pendingStep.total}
+              success={pendingStep.success}
+              onContinue={advancePending}
+            />
+          )}
           {pendingStep.kind === 'death' && (
             <StoryInterstitial
               kind="death"
@@ -268,10 +293,16 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
             />
           </>
         )}
-        <button type="button" className="story-shell__new-game" onClick={onStartNewGame}>
-          Start a new adventure
-        </button>
+        <div className="story-shell__footer-links">
+          <button type="button" className="story-shell__new-game" onClick={onStartNewGame}>
+            Start a new adventure
+          </button>
+          <button type="button" className="story-shell__skills-toggle" onClick={() => setShowSkillsGuide(true)}>
+            Skills Guide
+          </button>
+        </div>
       </main>
+      {showSkillsGuide && <SkillsGuide onClose={() => setShowSkillsGuide(false)} />}
     </div>
   )
 }

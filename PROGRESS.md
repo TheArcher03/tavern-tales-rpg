@@ -3,8 +3,8 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Playability systems pass (leveling, death, shops, chapter breaks, attribution) — built and verified live; not yet committed
-Date: 2026-09-10
+## Status: UX polish pass (auto-scroll, skills guide, party-wide leveling, title screen, dice animation) — built and verified live; not yet committed
+Date: 2026-09-11
 
 ## Tech stack (decided)
 - **Client**: Vite + React + TypeScript (`client/`)
@@ -979,9 +979,9 @@ just one-shot flavor effects).
   confirming persistence still holds with no `GameSave` schema changes
   needed (new `Character`/`Item` fields are additive JSON). Zero console
   errors throughout.
-- **Not yet committed** — per the standing "commit after each act"
-  instruction, this pass isn't a campaign act, so committing needs the
-  user's go-ahead rather than assuming that blanket permission applies.
+- Committed and pushed as `98acc08` (bundled with the same session's
+  dark-mode/tavern-theme fix — the user confirmed committing both
+  together rather than splitting them).
 
 ### Item 7 status: Act 2/3 roadmap
 Still just a roadmap (see the plan file) — branch the new Act 2 opening on
@@ -992,6 +992,82 @@ ritual" using the established cast (Vesh, the Ashen Circle's aftermath),
 and let the new systems above be load-bearing from scene one instead of
 retrofitted. Not started — waiting on the user's direction per their
 stated plan to review this pass first.
+
+## UX polish pass: auto-scroll, skills guide, party-wide leveling, title screen, dice animation
+The user played through the campaign again and came back with six more
+notes. Five became concrete client-side work; the sixth ("the DM's rolls
+are always super high") was a misunderstanding to clear up, not a bug —
+there is no separate DM/monster roll anywhere in this game. Every
+encounter resolves as **one** roll (the acting party member's) against a
+fixed DC set when the scene was authored; the DC is not itself rolled or
+randomized. What might read as "the DM's roll" is just that DC number in
+the check log (e.g. "vs DC 13").
+
+- **Auto-scroll** (`StoryLog.tsx`): a sentinel div after the entries list,
+  scrolled into view via `useEffect` keyed on `entries.length` — the log
+  now follows new narration/choices without the player scrolling manually.
+- **Skills Guide** (`SkillsGuide.tsx`, new): a dismissible modal listing
+  plain-English descriptions for all 18 SRD skills (Sleight of Hand,
+  Stealth, Arcana, etc. — the ones that aren't a raw ability score),
+  opened via a new "Skills Guide" link next to "Start a new adventure".
+  `Record<SkillName, string>` makes the description table exhaustive at
+  the type level — a skill added to `skills.ts` later would fail to
+  compile here until it's covered.
+- **Level up all four party members interactively** — reverses part of
+  the previous pass's design (companions were auto-assigned there,
+  confirmed with the user as the recommended option at the time). Now
+  every level-up shows the same `LevelUpChoice` screen for all four slots,
+  one at a time, sequentially, whoever they are. `autoAssignCompanion
+  AbilityIncrease` and the now-unnecessary exported `CLASS_PRIORITY_
+  ABILITIES`/`pickRandom` from `companion.ts` were deleted entirely
+  (reverted back to module-private) rather than left as dead code.
+- **Title screen** (`TitleScreen.tsx`, new, `client/src/features/party/`):
+  shown before character creation (and again after "Start a new
+  adventure"), reading the campaign title and all three act titles
+  directly off each act's `chapterBreak.enteringTitle` metadata — the
+  same source `StoryShell`'s mid-game splashes already use — so it can
+  never drift out of sync as acts are added or renamed. Wired into
+  `App.tsx` via a `showTitleScreen` flag that only gates the "no active
+  party" branch; resuming a saved game skips it entirely.
+- **Dice roll dramatization** (`DiceRollReveal.tsx`, new): the real check
+  still resolves immediately in `resolveEncounterChoice` — nothing about
+  the mechanic changed — but revealing it is now a new `'diceRoll'`
+  pending-step (added to the same pending-interstitials queue the
+  previous pass built, always first in line for encounter choices only)
+  showing a spinning d20 for ~1.1s before settling on the actual roll,
+  with a success/failure color treatment and the DC shown as the target.
+  Clicking the die during the spin skips straight to the reveal. This
+  required extending `EncounterOutcome` (`engine.ts`) with the raw
+  `check: CheckResult`, `actorName`, and `checkLabel` fields — previously
+  only a pre-formatted `checkLog` string was exposed, which wasn't enough
+  to drive an animation without regex-parsing it.
+- **Bug found while restarting this session**: the dev server process
+  from the prior session had stopped (a Claude Code session boundary, not
+  a code issue), and the Browser tool's console history had accumulated
+  stale HMR error messages from mid-edit earlier in the session (a
+  transient export mismatch while `autoAssignCompanionAbilityIncrease`
+  was being removed, self-resolved once both the export and its import
+  were updated together). Confirmed these were stale, not current, by
+  reading console errors from a **fresh** tab after restarting the dev
+  server — came back clean. Worth remembering: `read_console_messages`
+  accumulates for a tab's whole lifetime and doesn't clear on reload: a
+  fresh tab is the reliable way to confirm "no current errors" after a
+  mid-session code change that briefly broke module resolution.
+- Shared suite is still 86/86 (net zero: removed
+  `autoAssignCompanionAbilityIncrease`'s test, added one covering
+  `EncounterOutcome`'s new `actorName`/`checkLabel`/`check` fields).
+- Verified live end to end in the browser: the title screen with all
+  three dynamically-sourced act titles; auto-scroll keeping pace through
+  an encounter and its choices with no manual scrolling; the Skills Guide
+  modal; a dice-roll reveal (spin → settle on the actual roll → DC
+  comparison → success/failure color); and a full party-wide level-up
+  where **all four** members — including both companions — got their own
+  interactive ability-choice screen in sequence, committing correctly in
+  one shot at the end. Confirmed persistence survived a full dev-server
+  restart (mid-session, unrelated to this pass) with the party exactly
+  where it was left. Zero console errors on a fresh tab.
+- **Not yet committed** — same reasoning as the previous pass: this is a
+  UX/systems pass, not a campaign act, so it needs the user's go-ahead.
 
 ## Superseded: original Act 3 planning notes
 The section below was written when only Acts 1-2 existed and Act 3 was

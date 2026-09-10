@@ -1,10 +1,9 @@
 import { ABILITY_SCORE_MAX, abilityModifier, type AbilityName } from '../abilities.js'
 import { alignmentLabel, shiftAlignment } from '../alignment.js'
 import { getCharacterClass } from '../characterClass.js'
-import { resolveCheck } from '../check.js'
+import { resolveCheck, type CheckResult } from '../check.js'
 import type { Character } from '../character.js'
 import { resolveLevelUp } from '../leveling.js'
-import { CLASS_PRIORITY_ABILITIES, pickRandom } from './companion.js'
 import type { PartyState } from './partyState.js'
 import type { Choice, EncounterChoice, EffectTarget, PartySlot, SceneCondition, SceneEffect, ShopOffer } from './types.js'
 
@@ -187,6 +186,11 @@ export function resolveChoice(party: PartyState, choice: Choice, random: () => n
 export interface EncounterOutcome extends ChoiceOutcome {
   success: boolean
   checkLog: string
+  /** Who actually rolled (after any "no softlock" substitution) — lets the client dramatize the roll without re-deriving who acted. */
+  actorName: string
+  /** The label shown alongside the roll, e.g. "STR check" or "Stealth check". */
+  checkLabel: string
+  check: CheckResult
 }
 
 // Picks who actually attempts an encounter choice: the authored actor, or —
@@ -236,6 +240,9 @@ export function resolveEncounterChoice(
     party: next,
     logs,
     checkLog,
+    actorName: actor.name,
+    checkLabel: label,
+    check,
     success: check.success,
     nextSceneId: check.success ? choice.successNext : choice.failureNext,
     deaths,
@@ -259,15 +266,6 @@ export function applyAbilityIncrease(party: PartyState, target: PartySlot, abili
       armorClass: ability === 'DEX' ? 10 + abilityModifiers.DEX : member.armorClass,
     }
   })
-}
-
-// Picks a level-up ability for a CPU-controlled companion — weighted
-// toward that class's priority abilities (the same heuristic
-// generateCompanion already uses to build them), "strategically
-// randomized" per the class's persona rather than a single fixed pick.
-export function autoAssignCompanionAbilityIncrease(character: Character, random: () => number = Math.random): AbilityName {
-  const priority = CLASS_PRIORITY_ABILITIES[character.classId]
-  return priority && priority.length > 0 ? pickRandom(priority, random) : 'CON'
 }
 
 // Buys one shop offer: deducts gold, grants the item (if any) and/or

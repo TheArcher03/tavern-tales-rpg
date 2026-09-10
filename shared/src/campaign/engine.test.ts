@@ -4,7 +4,6 @@ import { createCharacter } from '../character.js'
 import {
   applyAbilityIncrease,
   applyEffect,
-  autoAssignCompanionAbilityIncrease,
   isChoiceAvailable,
   resolveChoice,
   resolveEncounterChoice,
@@ -120,6 +119,23 @@ test('resolveEncounterChoice branches to failureNext on a failing roll', () => {
   assert.equal(outcome.party.members[0].hitPoints.current, outcome.party.members[0].hitPoints.max - 2)
 })
 
+test('resolveEncounterChoice surfaces the acting member\'s name and the raw check breakdown', () => {
+  const choice: EncounterChoice = {
+    label: 'Force the door',
+    actor: 'pc1',
+    ability: 'STR',
+    dc: 5,
+    successNext: 'won',
+    failureNext: 'lost',
+  }
+  const outcome = resolveEncounterChoice(testParty(), choice, () => 0.9)
+  assert.equal(outcome.actorName, testParty().members[0].name)
+  assert.equal(outcome.checkLabel, 'STR check')
+  assert.equal(outcome.check.dc, 5)
+  assert.equal(outcome.check.total, outcome.check.roll + outcome.check.modifier)
+  assert.equal(outcome.check.success, outcome.success)
+})
+
 test('a hitPointChange effect that reduces HP to 0 marks the member dead and reports the death', () => {
   const party = testParty()
   const { party: next, deaths } = applyEffect(party, { type: 'hitPointChange', target: 'pc1', delta: -999, reason: 'test' })
@@ -184,14 +200,6 @@ test('applyAbilityIncrease leaves armor class alone for non-DEX abilities', () =
   const party = testParty()
   const bumped = applyAbilityIncrease(party, 'pc1', 'STR')
   assert.equal(bumped.members[0].armorClass, party.members[0].armorClass)
-})
-
-test('autoAssignCompanionAbilityIncrease picks from the class priority list, deterministically for a fixed random', () => {
-  const fighter = testCharacter('c1', { classId: 'fighter' })
-  const ability = autoAssignCompanionAbilityIncrease(fighter, () => 0)
-  assert.ok(['STR', 'CON'].includes(ability))
-  const abilityAgain = autoAssignCompanionAbilityIncrease(fighter, () => 0)
-  assert.equal(ability, abilityAgain)
 })
 
 test('resolvePurchase deducts gold and grants the item on success', () => {

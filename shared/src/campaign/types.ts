@@ -34,11 +34,21 @@ export interface Choice {
   condition?: SceneCondition
 }
 
+// Marks a scene as the start of a new act. The client shows a full-screen
+// splash (completedTitle, if given, above enteringTitle) before revealing
+// this scene's narration/choices.
+export interface ChapterBreak {
+  completedTitle?: string
+  enteringTitle: string
+  enteringSubtitle?: string
+}
+
 export interface NarrationScene {
   type: 'narration'
   id: string
   narration: string
   choices: Choice[]
+  chapterBreak?: ChapterBreak
 }
 
 export interface MonsterStatBlock {
@@ -81,6 +91,29 @@ export interface EndingScene {
   narration: string
 }
 
-export type Scene = NarrationScene | EncounterScene | EndingScene
+// A shop's wares. Buying either grants an item to the shared treasury
+// (item?) or applies effects immediately (effects?, e.g. a fortune-teller's
+// reading) — an offer may do either or both.
+export interface ShopOffer {
+  id: string
+  name: string
+  description: string
+  cost: number
+  item?: Item
+  effects?: SceneEffect[]
+}
+
+export interface ShopScene {
+  type: 'shop'
+  id: string
+  narration: string
+  /** Display name for who's selling, e.g. "A Traveling Peddler". */
+  shopkeeper: string
+  offers: ShopOffer[]
+  /** How to leave the shop — reuses the same gated-choice machinery as narration scenes. */
+  choices: Choice[]
+}
+
+export type Scene = NarrationScene | EncounterScene | EndingScene | ShopScene
 
 export type Campaign = Record<string, Scene>

@@ -32,6 +32,8 @@ export interface Character {
   curses: Curse[]
   /** Player-created vs. CPU-generated party member. Defaults to 'player'. */
   role: CharacterRole
+  /** Set to 'dead' when hit points are reduced to 0. Defaults to 'alive'. */
+  status: 'alive' | 'dead'
 }
 
 export interface CreateCharacterInput {
@@ -82,5 +84,6 @@ export function createCharacter(input: CreateCharacterInput): Character {
     alignment: { moral: 0, ethical: 0 },
     curses: [],
     role: 'player',
+    status: 'alive',
   }
 }

@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Full campaign complete (Acts 1-3, 4 distinct endings) — built and verified live end to end
+## Status: Playability systems pass (leveling, death, shops, chapter breaks, attribution) — built and verified live; not yet committed
 Date: 2026-09-10
 
 ## Tech stack (decided)
@@ -876,6 +876,122 @@ flagging if asked, not started unprompted:
 - The live-DM mode (`server/`, `dmClient.ts`, `FreeTextInput.tsx`, the old
   `CharacterSheet.tsx`) remains in the repo, untouched and dormant, per
   the earlier confirmed decision to keep it rather than delete it.
+
+## Playability systems pass: leveling, death, shops, chapter breaks, attribution
+The user played the full campaign and came back with seven pieces of
+feedback. Six became concrete engine + UI work in this pass (full design
+in `~/.claude/plans/playful-mapping-hopper.md`); the seventh — treating
+the current 3 acts as "Act 1" of something longer, with a real Act 2/3 to
+follow — is captured there as a roadmap, not yet authored.
+
+Three design forks were resolved with the user via `AskUserQuestion`
+before implementation: **death** is narrative (dies dramatically, shown
+dead in the party panel) with automatic actor substitution rather than
+true permadeath (no softlock risk, no rewrites to existing content);
+**leveling** gives the player a +1 ability choice per level-up for their
+2 characters, with companions auto-assigned toward their class's existing
+priority-ability heuristic; **shops** are a real usable-item economy
+(purchased items sit in the shared treasury and can be used any time, not
+just one-shot flavor effects).
+
+- **Data model** (`shared/src/`): `Character` gained `status: 'alive' |
+  'dead'`; `Item` gained optional `usable?: { effects, useNarration }`;
+  new `ShopOffer`/`ShopScene` types (`Scene` is now a 4-way union);
+  `NarrationScene` gained optional `chapterBreak?` metadata. `abilities.ts`
+  gained `ABILITY_SCORE_MAX = 20` (the real SRD leveling ceiling, distinct
+  from the point-buy creation cap of 15). `item.ts` and `campaign/types.ts`
+  now have a deliberate circular *type-only* import between them (Item
+  needs SceneEffect for `usable`, SceneEffect needs Item for `grantItem`)
+  — safe because both files are pure interface declarations with no
+  runtime code, erased entirely at compile time.
+- **Engine** (`campaign/engine.ts`): `hitPointChange` now flips a member to
+  `status: 'dead'` the moment HP clamps to 0, and `EffectOutcome`/
+  `ChoiceOutcome`/`EncounterOutcome` all surface a `deaths: string[]` so
+  the client can detect deaths structurally instead of parsing log text.
+  New exported `resolveActingMember(party, choice)` is the entire
+  "no softlock" mechanism: if an `EncounterChoice`'s authored actor has
+  died, it substitutes the living member with the best modifier for that
+  ability — used both to actually resolve the check and (after a bug
+  found during live verification, see below) to preview who's really
+  acting before the roll. New `applyAbilityIncrease`, exported
+  `CLASS_PRIORITY_ABILITIES`-backed `autoAssignCompanionAbilityIncrease`,
+  `resolvePurchase` (afford/can't-afford), and `useItem` (removes exactly
+  one matching treasury entry by index, not every item sharing that id —
+  duplicates like two Healing Draughts must stay independent).
+- **Client**: a new unified "pending interstitials" queue in
+  `StoryShell.tsx` — death splashes, level-up ability choices, and
+  chapter-break splashes all pause the normal log/choice flow and are
+  worked through one at a time before a transition commits in a single
+  `onPartyChange`/`onEntriesChange` call (none of this is persisted
+  mid-flight; refreshing mid-interstitial loses that one in-flight
+  transition, an accepted tradeoff). New `StoryInterstitial.tsx` (one
+  reusable full-screen component for both chapter and death moments),
+  `LevelUpChoice.tsx`, `ShopScreen.tsx`. `PartyPanel.tsx` members are now
+  individually expandable to show full ability scores (directly enabling
+  informed use of the new actor-name tags on `ChoiceButtons`), dead
+  members render as a greyed-out 🪦 tombstone card instead of stats, and
+  usable treasury items get an inline "Use" button. A party-wide wipe
+  (`status: 'dead'` on all four) overrides the destination scene to a new
+  `party-wiped` safety-net ending (`campaign/globalEndings.ts`) regardless
+  of what the authored content said next.
+- **Content retrofits to Acts 1-3**: `chapterBreak` added to
+  `act1-start`/`act2-start`/`act3-start` (Act 1 gets an opening-only
+  splash; Acts 2-3 get a "completed X / entering Y" splash); one shop
+  scene added to each act's hub as an extra, always-available option
+  (a peddler's cart in Act 1, a scavenger cache in Act 2, a hermit in
+  Act 3) — each offering a healing item, a curse-cleansing item covering
+  that act's own curses, and one immediate-effect (non-item) offer,
+  exercising both `ShopOffer` paths. `validate.ts`'s
+  `findCampaignErrors`/`findUnreachableScenes` were extended to handle
+  the new `'shop'` scene type, and `findUnreachableScenes` now accepts
+  multiple start ids so `campaign.test.ts` can seed `'party-wiped'` as a
+  root (it's only ever reached dynamically, never via an authored choice,
+  so it would otherwise be a false "unreachable" positive).
+- **Bug found and fixed during live verification**: the actor-name tag on
+  an `EncounterChoice` button was computed by reading the *authored*
+  slot's name directly, so a choice authored for a now-dead character
+  still showed that character's name on the button even though
+  `resolveEncounterChoice` would silently substitute someone else at
+  resolution time — confusing (the tag promises one actor, the check log
+  reports another). Fixed by exporting `resolveActingMember` from
+  `engine.ts` and using it for the preview too, so the tag and the actual
+  resolution can never disagree. Confirmed live before and after (dead
+  Talia's tag replaced with the correct living substitute; normal
+  living-actor tags unaffected).
+- Shared suite is now 86/86 (12 net new tests covering ability increases,
+  companion auto-assignment, death/resurrection-immunity, actor
+  substitution, purchase afford/can't-afford, and item-use duplicate
+  handling).
+- Verified live end to end in the browser across a single continuous
+  playthrough: the Act I opening chapter-break splash; actor-name tags on
+  encounter choices; the party-panel ability-score expand toggle; a full
+  shop purchase (both an item and an immediate-effect offer, confirmed
+  disabled-state at 0 gold); using a purchased item from the party panel
+  outside the shop; both PCs' level-up ability-choice screens with
+  companions silently auto-bumped (and correctly healed along with the
+  level, matching Stage 6's original "leveling heals as it raises the
+  cap" behavior); the Act I → Act II chapter-break splash; a real death
+  (forced via a deliberately low HP setup rather than relying on random
+  luck) producing the death splash and tombstone card; a subsequent
+  encounter authored for the dead character correctly substituting a
+  living member, both in the resolved check log and (after the fix above)
+  in the choice button's preview tag; and a full page refresh mid-game
+  confirming persistence still holds with no `GameSave` schema changes
+  needed (new `Character`/`Item` fields are additive JSON). Zero console
+  errors throughout.
+- **Not yet committed** — per the standing "commit after each act"
+  instruction, this pass isn't a campaign act, so committing needs the
+  user's go-ahead rather than assuming that blanket permission applies.
+
+### Item 7 status: Act 2/3 roadmap
+Still just a roadmap (see the plan file) — branch the new Act 2 opening on
+which of the 4 existing endings was reached via a permanent flag (short
+flag-gated variants converging onto a shared spine, the same pattern
+`knowsRaiderCamp`/`wardsWeakened` already use), escalate past "stop one
+ritual" using the established cast (Vesh, the Ashen Circle's aftermath),
+and let the new systems above be load-bearing from scene one instead of
+retrofitted. Not started — waiting on the user's direction per their
+stated plan to review this pass first.
 
 ## Superseded: original Act 3 planning notes
 The section below was written when only Acts 1-2 existed and Act 3 was

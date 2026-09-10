@@ -14,13 +14,23 @@ test('the merged campaign has no structural errors (dangling links, empty choice
 })
 
 test('the merged campaign has no scenes unreachable from the starting scene', () => {
-  assert.deepEqual(findUnreachableScenes(ACTIVE_CAMPAIGN, CAMPAIGN_START_SCENE_ID), [])
+  // 'party-wiped' is a safety-net ending StoryShell routes to directly at
+  // runtime (every party member dead) — it's never referenced by an
+  // authored choice, so it's seeded as an extra root rather than a false
+  // "unreachable" positive.
+  assert.deepEqual(findUnreachableScenes(ACTIVE_CAMPAIGN, [CAMPAIGN_START_SCENE_ID, 'party-wiped']), [])
 })
 
-test('the merged campaign has exactly four distinct endings', () => {
+test('the merged campaign has exactly five distinct endings', () => {
   const endings = Object.values(ACTIVE_CAMPAIGN).filter((scene) => scene.type === 'ending')
   const ids = endings.map((ending) => ending.id).sort()
-  assert.deepEqual(ids, ['act3-ending-bound', 'act3-ending-circle', 'act3-ending-spared', 'act3-ending-wakes'])
+  assert.deepEqual(ids, [
+    'act3-ending-bound',
+    'act3-ending-circle',
+    'act3-ending-spared',
+    'act3-ending-wakes',
+    'party-wiped',
+  ])
 })
 
 test('every ending has a distinct title', () => {

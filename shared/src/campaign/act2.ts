@@ -21,6 +21,7 @@ export const ACT2_SCENES: Campaign = {
   'act2-start': {
     type: 'narration',
     id: 'act2-start',
+    chapterBreak: { completedTitle: 'Act I: Ash Over Millhaven', enteringTitle: 'Act II: Into the Thornwood' },
     narration:
       'The Thornwood closes over you like a held breath — no road, no moon through the canopy, just the raiders\' trail ' +
       'pressed into the leaf-mold ahead. It splits three ways before you\'ve gone a mile: a low mire glinting between the ' +
@@ -397,8 +398,61 @@ export const ACT2_SCENES: Campaign = {
         next: 'act2-eavesdrop',
         condition: { flag: 'eavesdropDone', equals: false },
       },
+      { label: "Pick through the raiders' own scavenged supplies", next: 'act2-scavenger-cache' },
       { label: 'Move now — free Sella and recover the Cinderseal', next: 'act2-infiltrate-choice' },
     ],
+  },
+
+  'act2-scavenger-cache': {
+    type: 'shop',
+    id: 'act2-scavenger-cache',
+    shopkeeper: "The Raiders' Own Supplies",
+    narration:
+      'A supply crate near the perimeter, half-buried and clearly not meant for anyone outside the Ashen Circle. Whatever ' +
+      'they were saving it for, it\'s yours now if you\'re willing to spend a few minutes going through it.',
+    offers: [
+      {
+        id: 'mending-salve',
+        name: 'Mending Salve',
+        description: 'A tin of raider field-dressing, better stocked than it has any right to be.',
+        cost: 12,
+        item: {
+          id: 'mending-salve',
+          name: 'Mending Salve',
+          description: 'A tin of raider field-dressing.',
+          usable: {
+            effects: [{ type: 'hitPointChange', target: 'random', delta: 10, reason: 'the salve takes effect' }],
+            useNarration: 'Someone applies the salve, and a wound closes faster than it should.',
+          },
+        },
+      },
+      {
+        id: 'snare-charm',
+        name: 'Snare-Ward Charm',
+        description: 'A twist of raider ward-cord. Removes a Snaremark or Tanglefoot curse, if you\'re carrying one.',
+        cost: 15,
+        item: {
+          id: 'snare-charm',
+          name: 'Snare-Ward Charm',
+          description: 'A twist of ward-cord, cool to the touch.',
+          usable: {
+            effects: [
+              { type: 'removeCurse', target: 'party', curseId: 'snaremark' },
+              { type: 'removeCurse', target: 'party', curseId: 'tanglefoot' },
+            ],
+            useNarration: 'The cord unravels on its own the moment it\'s used — and with it, a curse lifts.',
+          },
+        },
+      },
+      {
+        id: 'stolen-sketch',
+        name: "A Stolen Map Sketch",
+        description: "A rough sketch of the camp's guard rotations, dropped by someone in a hurry — the same thing a careful scout would have to work out by watching.",
+        cost: 8,
+        effects: [{ type: 'setFlag', flag: 'knowsGuardPattern' }],
+      },
+    ],
+    choices: [{ label: 'Pocket what you can carry and move on', next: 'act2-hub' }],
   },
 
   // --- Hub spoke: scout the perimeter ---

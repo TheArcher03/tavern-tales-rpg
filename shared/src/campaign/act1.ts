@@ -18,6 +18,7 @@ export const ACT1_SCENES: Campaign = {
   'act1-start': {
     type: 'narration',
     id: 'act1-start',
+    chapterBreak: { enteringTitle: 'Act I: Ash Over Millhaven' },
     narration:
       'Millhaven sleeps under a low harvest moon — grain towers dark against the sky, the river mill silent for the night. ' +
       'Then the bell in the square starts screaming, and torchlight blooms at the edge of town: riders in ash-grey cloaks, ' +
@@ -375,8 +376,61 @@ export const ACT1_SCENES: Campaign = {
         next: 'act1-miller-chat',
         condition: { flag: 'millerChatDone', equals: false },
       },
+      { label: "Visit the peddler's cart, spared by the raid", next: 'act1-peddler' },
       { label: 'Enough — set out after the trail now', next: 'act1-milestone' },
     ],
+  },
+
+  'act1-peddler': {
+    type: 'shop',
+    id: 'act1-peddler',
+    shopkeeper: "A Peddler's Cart, Spared by the Raid",
+    narration:
+      'One cart survived the night untouched — either luck or the Ashen Circle simply had no interest in it. The peddler ' +
+      'is still shaking, but business is business, and business right now means you.',
+    offers: [
+      {
+        id: 'healing-draught',
+        name: 'Healing Draught',
+        description: 'A small corked vial, faintly warm. Keep it for whenever it\'s needed most.',
+        cost: 10,
+        item: {
+          id: 'healing-draught',
+          name: 'Healing Draught',
+          description: 'A small corked vial, faintly warm.',
+          usable: {
+            effects: [{ type: 'hitPointChange', target: 'random', delta: 10, reason: 'the draught takes effect' }],
+            useNarration: 'Someone drinks the draught, and the ache of the day\'s wounds fades.',
+          },
+        },
+      },
+      {
+        id: 'ward-charm',
+        name: 'Ward-Cleansing Charm',
+        description: 'A knotted cord the peddler swears is proof against ash-magic. Removes an Ashmark or Wardburn curse, if you\'re carrying one.',
+        cost: 15,
+        item: {
+          id: 'ward-charm',
+          name: 'Ward-Cleansing Charm',
+          description: 'A knotted cord, still faintly warm from the peddler\'s hands.',
+          usable: {
+            effects: [
+              { type: 'removeCurse', target: 'party', curseId: 'ashmark' },
+              { type: 'removeCurse', target: 'party', curseId: 'wardburn' },
+            ],
+            useNarration: 'The charm crumbles to ash the moment it touches skin — and with it, a curse lifts.',
+          },
+        },
+      },
+      {
+        id: 'hot-meal',
+        name: 'A Hot Meal',
+        description: 'Bread, stew, and a moment to sit down before the road. Warms everyone a little.',
+        cost: 5,
+        effects: [{ type: 'hitPointChange', target: 'party', delta: 3, reason: 'a hot meal before the road' }],
+      },
+    ],
+    choices: [{ label: 'Thank the peddler and return to the square', next: 'act1-hub' }],
   },
 
   // --- Hub spoke: interrogate the wounded raider ---

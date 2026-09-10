@@ -17,9 +17,9 @@ export function findCampaignErrors(campaign: Campaign): string[] {
       errors.push(`scene keyed "${id}" has mismatched internal id "${scene.id}"`)
     }
 
-    if (scene.type === 'narration') {
+    if (scene.type === 'narration' || scene.type === 'shop') {
       if (scene.choices.length === 0) {
-        errors.push(`${id}: narration scene has no choices — use type "ending" if that's intentional`)
+        errors.push(`${id}: ${scene.type} scene has no choices — use type "ending" if that's intentional`)
       }
       for (const choice of scene.choices) {
         checkTarget(id, choice.next, `choice "${choice.label}"`)
@@ -38,11 +38,15 @@ export function findCampaignErrors(campaign: Campaign): string[] {
   return errors
 }
 
-// Scenes not reachable by any path from the starting scene — usually a
+// Scenes not reachable by any path from the starting scene(s) — usually a
 // sign of a typo'd scene id or an orphaned draft scene left in the file.
-export function findUnreachableScenes(campaign: Campaign, startSceneId: string): string[] {
+// Accepts multiple start ids so scenes that are only reachable dynamically
+// at runtime (e.g. a safety-net ending StoryShell routes to directly, never
+// via an authored choice) can be seeded as additional roots rather than
+// flagged as false positives.
+export function findUnreachableScenes(campaign: Campaign, startSceneIds: string | string[]): string[] {
   const visited = new Set<string>()
-  const queue: string[] = [startSceneId]
+  const queue: string[] = Array.isArray(startSceneIds) ? [...startSceneIds] : [startSceneIds]
 
   while (queue.length > 0) {
     const id = queue.shift() as string
@@ -51,7 +55,7 @@ export function findUnreachableScenes(campaign: Campaign, startSceneId: string):
     if (!scene) continue
     visited.add(id)
 
-    if (scene.type === 'narration') {
+    if (scene.type === 'narration' || scene.type === 'shop') {
       for (const choice of scene.choices) queue.push(choice.next)
     } else if (scene.type === 'encounter') {
       for (const choice of scene.choices) {

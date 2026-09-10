@@ -4,6 +4,11 @@ export const ABILITY_NAMES: readonly AbilityName[] = ['STR', 'DEX', 'CON', 'INT'
 
 export type AbilityScores = Record<AbilityName, number>
 
+// The real SRD ability-score ceiling for a level-up increase — distinct
+// from POINT_BUY_MAX_SCORE (15), which only bounds character-creation
+// point-buy, not what a character can reach afterward via leveling.
+export const ABILITY_SCORE_MAX = 20
+
 export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2)
 }

@@ -28,6 +28,7 @@ export const ACT3_SCENES: Campaign = {
   'act3-start': {
     type: 'narration',
     id: 'act3-start',
+    chapterBreak: { completedTitle: 'Act II: Into the Thornwood', enteringTitle: 'Act III: The Umbral Scar' },
     narration:
       'The Thornwood thins into something older and stranger — twisted, ash-pale trees ringing a sunken hollow where the ' +
       'ground itself seems to hold its breath. This is the Umbral Scar. Firelight and chanting drift up from somewhere ' +
@@ -381,8 +382,65 @@ export const ACT3_SCENES: Campaign = {
         next: 'act3-meva',
         condition: { flag: 'metMeva' },
       },
+      { label: "Visit the hermit camped at the Scar's edge", next: 'act3-hermit' },
       { label: 'Move now — stop the ritual before it completes', next: 'act3-ritual-confront-approach' },
     ],
+  },
+
+  'act3-hermit': {
+    type: 'shop',
+    id: 'act3-hermit',
+    shopkeeper: "A Hermit at the Scar's Edge",
+    narration:
+      'She\'s been camped here for weeks, she says, watching the Ashen Circle come and go and keeping her own counsel. ' +
+      '"Everyone needs something before they go down there," she says, gesturing at a small collection of salvaged goods. ' +
+      '"Sit a while. I don\'t bite."',
+    offers: [
+      {
+        id: 'bottled-courage',
+        name: 'Bottled Courage',
+        description: 'A dark little bottle that smells worse than it tastes. Keep it for whenever it\'s needed most.',
+        cost: 12,
+        item: {
+          id: 'bottled-courage',
+          name: 'Bottled Courage',
+          description: 'A dark little bottle, corked tight.',
+          usable: {
+            effects: [{ type: 'hitPointChange', target: 'random', delta: 10, reason: 'the bottle\'s contents take effect' }],
+            useNarration: 'Someone drinks it down in one go, and the pain of the last few hours dulls considerably.',
+          },
+        },
+      },
+      {
+        id: 'ashen-ward-talisman',
+        name: 'Ashen-Ward Talisman',
+        description: 'A talisman strung with old bone. Removes a Brazier Scar or Ward Feedback curse, if you\'re carrying one.',
+        cost: 15,
+        item: {
+          id: 'ashen-ward-talisman',
+          name: 'Ashen-Ward Talisman',
+          description: 'A talisman of old bone and knotted cord.',
+          usable: {
+            effects: [
+              { type: 'removeCurse', target: 'party', curseId: 'brazierscar' },
+              { type: 'removeCurse', target: 'party', curseId: 'wardfeedback' },
+            ],
+            useNarration: 'The talisman goes cold and still the moment it\'s used — and with it, a curse lifts.',
+          },
+        },
+      },
+      {
+        id: 'bone-reading',
+        name: 'A Reading of the Bones',
+        description: 'She casts a handful of small bones across a cloth and reads them without looking up. Whatever she sees, she doesn\'t sugarcoat it.',
+        cost: 10,
+        effects: [
+          { type: 'setFlag', flag: 'hermitFortuneTold' },
+          { type: 'alignmentShift', target: 'party', ethicalDelta: 3, reason: 'a stranger\'s unflinching reading leaves you steadier in your convictions' },
+        ],
+      },
+    ],
+    choices: [{ label: 'Thank the hermit and move on', next: 'act3-hub' }],
   },
 
   // --- Hub spoke: scout the ritual site ---

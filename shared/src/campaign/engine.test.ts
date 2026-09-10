@@ -2,13 +2,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createCharacter } from '../character.js'
 import {
+  applyAbilityIncrease,
   applyEffect,
+  autoAssignCompanionAbilityIncrease,
   isChoiceAvailable,
   resolveChoice,
   resolveEncounterChoice,
+  resolvePurchase,
+  useItem,
 } from './engine.js'
 import { createPartyState } from './partyState.js'
-import type { EncounterChoice } from './types.js'
+import type { EncounterChoice, ShopOffer } from './types.js'
 
 function testCharacter(id: string, overrides: Partial<Parameters<typeof createCharacter>[0]> = {}) {
   return createCharacter({
@@ -114,4 +118,116 @@ test('resolveEncounterChoice branches to failureNext on a failing roll', () => {
   assert.equal(outcome.success, false)
   assert.equal(outcome.nextSceneId, 'lost')
   assert.equal(outcome.party.members[0].hitPoints.current, outcome.party.members[0].hitPoints.max - 2)
+})
+
+test('a hitPointChange effect that reduces HP to 0 marks the member dead and reports the death', () => {
+  const party = testParty()
+  const { party: next, deaths } = applyEffect(party, { type: 'hitPointChange', target: 'pc1', delta: -999, reason: 'test' })
+  assert.equal(next.members[0].status, 'dead')
+  assert.deepEqual(deaths, [next.members[0].name])
+})
+
+test('a hitPointChange effect that only damages (not to 0) does not mark anyone dead', () => {
+  const { party: next, deaths } = applyEffect(testParty(), { type: 'hitPointChange', target: 'pc1', delta: -1, reason: 'test' })
+  assert.equal(next.members[0].status, 'alive')
+  assert.equal(deaths, undefined)
+})
+
+test('healing a dead member does not resurrect them (status stays dead once set)', () => {
+  const dead = applyEffect(testParty(), { type: 'hitPointChange', target: 'pc1', delta: -999, reason: 'test' }).party
+  const healed = applyEffect(dead, { type: 'hitPointChange', target: 'pc1', delta: 999, reason: 'test' }).party
+  assert.equal(healed.members[0].status, 'dead')
+})
+
+test('resolveEncounterChoice substitutes a living member when the authored actor is dead', () => {
+  const alive = testParty()
+  // pc1 (STR 15, mod +2) dies; pc2 also has STR 15 here, so bump companion1's
+  // STR so the substitution is unambiguous and verifiable.
+  const withDeadPc1 = applyEffect(alive, { type: 'hitPointChange', target: 'pc1', delta: -999, reason: 'test' }).party
+  const boosted = {
+    ...withDeadPc1,
+    members: withDeadPc1.members.map((member, index) =>
+      index === 2 ? { ...member, abilityModifiers: { ...member.abilityModifiers, STR: 10 } } : member,
+    ) as typeof withDeadPc1.members,
+  }
+  const choice: EncounterChoice = {
+    label: 'Force the door',
+    actor: 'pc1',
+    ability: 'STR',
+    dc: 5,
+    successNext: 'won',
+    failureNext: 'lost',
+  }
+  const outcome = resolveEncounterChoice(boosted, choice, () => 0.9)
+  assert.match(outcome.checkLog, /companion1/i)
+})
+
+test('applyAbilityIncrease bumps the ability, recomputes the modifier, and caps at 20', () => {
+  const party = testParty()
+  const bumped = applyAbilityIncrease(party, 'pc1', 'STR')
+  assert.equal(bumped.members[0].abilityScores.STR, party.members[0].abilityScores.STR + 1)
+  assert.equal(bumped.members[0].abilityModifiers.STR, Math.floor((bumped.members[0].abilityScores.STR - 10) / 2))
+
+  const atCap = { ...party, members: party.members.map((m, i) => (i === 0 ? { ...m, abilityScores: { ...m.abilityScores, STR: 20 } } : m)) as typeof party.members }
+  const stillCapped = applyAbilityIncrease(atCap, 'pc1', 'STR')
+  assert.equal(stillCapped.members[0].abilityScores.STR, 20)
+})
+
+test('applyAbilityIncrease recomputes armor class when the ability is DEX', () => {
+  const party = testParty()
+  const bumped = applyAbilityIncrease(party, 'pc1', 'DEX')
+  assert.equal(bumped.members[0].armorClass, 10 + bumped.members[0].abilityModifiers.DEX)
+  assert.notEqual(bumped.members[0].armorClass, party.members[0].armorClass)
+})
+
+test('applyAbilityIncrease leaves armor class alone for non-DEX abilities', () => {
+  const party = testParty()
+  const bumped = applyAbilityIncrease(party, 'pc1', 'STR')
+  assert.equal(bumped.members[0].armorClass, party.members[0].armorClass)
+})
+
+test('autoAssignCompanionAbilityIncrease picks from the class priority list, deterministically for a fixed random', () => {
+  const fighter = testCharacter('c1', { classId: 'fighter' })
+  const ability = autoAssignCompanionAbilityIncrease(fighter, () => 0)
+  assert.ok(['STR', 'CON'].includes(ability))
+  const abilityAgain = autoAssignCompanionAbilityIncrease(fighter, () => 0)
+  assert.equal(ability, abilityAgain)
+})
+
+test('resolvePurchase deducts gold and grants the item on success', () => {
+  const party = { ...testParty(), sharedGold: 20 }
+  const offer: ShopOffer = { id: 'potion', name: 'Healing Draught', description: 'Heals wounds.', cost: 10, item: { id: 'potion', name: 'Healing Draught', description: 'Heals wounds.' } }
+  const { party: next, success } = resolvePurchase(party, offer)
+  assert.equal(success, true)
+  assert.equal(next.sharedGold, 10)
+  assert.equal(next.sharedTreasure.length, 1)
+})
+
+test('resolvePurchase refuses and leaves the party unchanged when unaffordable', () => {
+  const party = { ...testParty(), sharedGold: 5 }
+  const offer: ShopOffer = { id: 'potion', name: 'Healing Draught', description: 'Heals wounds.', cost: 10 }
+  const { party: next, success } = resolvePurchase(party, offer)
+  assert.equal(success, false)
+  assert.equal(next.sharedGold, 5)
+  assert.equal(next.sharedTreasure.length, 0)
+})
+
+test('useItem removes exactly one matching entry, not every entry sharing that id', () => {
+  const usableItem = {
+    id: 'draught',
+    name: 'Healing Draught',
+    description: 'Heals wounds.',
+    usable: { effects: [{ type: 'hitPointChange' as const, target: 'pc1' as const, delta: 5, reason: 'the draught takes effect' }], useNarration: 'You drink the draught.' },
+  }
+  const party = { ...testParty(), sharedTreasure: [usableItem, usableItem] }
+  const result = useItem(party, 'draught')
+  assert.ok(result)
+  assert.equal(result?.party.sharedTreasure.length, 1)
+})
+
+test('useItem returns null for a non-usable or missing item', () => {
+  const flavorItem = { id: 'trinket', name: 'Trinket', description: 'Just a trinket.' }
+  const party = { ...testParty(), sharedTreasure: [flavorItem] }
+  assert.equal(useItem(party, 'trinket'), null)
+  assert.equal(useItem(party, 'does-not-exist'), null)
 })

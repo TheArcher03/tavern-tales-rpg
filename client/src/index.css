@@ -1,5 +1,46 @@
 :root {
   color-scheme: light dark;
+
+  /* Parchment-and-firelight palette — a warm daylight tavern by default,
+     switching to a candlelit-at-night variant under prefers-color-scheme.
+     Every component reads these tokens rather than hardcoding colors, so
+     light/dark contrast can never silently break the way it did before. */
+  --color-bg: #ece0c4;
+  --color-bg-panel: #f8f0dc;
+  --color-bg-entry-dm: #fbf6e8;
+  --color-bg-entry-player: #d8c193;
+  --color-text: #3b2a18;
+  --color-text-muted: #7c6a4c;
+  --color-accent: #8a4b19;
+  --color-border: #cbb27e;
+  --color-button-bg: #7a3b12;
+  --color-button-bg-hover: #98501a;
+  --color-button-text: #f5ead0;
+  --color-danger: #a3291a;
+  --color-focus: #b5651d;
+  --color-glow: rgba(138, 75, 25, 0.14);
+
+  --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif;
+  --font-body: system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #17110b;
+    --color-bg-panel: #211a12;
+    --color-bg-entry-dm: #2a2014;
+    --color-bg-entry-player: #3d2c17;
+    --color-text: #ecdcb8;
+    --color-text-muted: #a58e64;
+    --color-accent: #e0a458;
+    --color-border: #4a3a22;
+    --color-button-bg: #c97b2e;
+    --color-button-bg-hover: #e0934a;
+    --color-button-text: #1c130a;
+    --color-danger: #e2685a;
+    --color-focus: #e0a458;
+    --color-glow: rgba(224, 164, 88, 0.16);
+  }
 }
 
 * {
@@ -8,4 +49,54 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at top, var(--color-glow), transparent 60%),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  color: var(--color-accent);
+}
+
+input,
+select {
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--color-text);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.6rem;
+}
+
+input:focus,
+select:focus,
+button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--color-button-text);
+  background: var(--color-button-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--color-button-bg-hover);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }

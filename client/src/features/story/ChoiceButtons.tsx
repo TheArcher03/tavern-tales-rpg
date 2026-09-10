@@ -1,6 +1,12 @@
+export interface ChoiceDescriptor {
+  label: string
+  /** Which party member would act on this choice — shown as a small tag so the player knows who they're committing before picking. */
+  actorName?: string
+}
+
 interface ChoiceButtonsProps {
-  choices: string[]
-  onChoose: (choice: string) => void
+  choices: ChoiceDescriptor[]
+  onChoose: (label: string) => void
   disabled?: boolean
 }
 
@@ -11,13 +17,14 @@ export function ChoiceButtons({ choices, onChoose, disabled = false }: ChoiceBut
     <div className="choice-buttons">
       {choices.map((choice) => (
         <button
-          key={choice}
+          key={choice.label}
           type="button"
           className="choice-buttons__choice"
-          onClick={() => onChoose(choice)}
+          onClick={() => onChoose(choice.label)}
           disabled={disabled}
         >
-          {choice}
+          {choice.actorName && <span className="choice-buttons__actor">{choice.actorName}</span>}
+          {choice.label}
         </button>
       ))}
     </div>

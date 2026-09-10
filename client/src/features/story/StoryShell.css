@@ -135,6 +135,12 @@
   border-radius: 0.25rem;
   padding: 0.1rem 0.35rem;
   flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.choice-buttons__proficient {
+  margin-left: 0.15rem;
+  color: var(--color-accent);
 }
 
 .free-text-input {
@@ -652,6 +658,13 @@
 .skills-guide__entry dt {
   font-weight: 700;
   color: var(--color-accent);
+}
+
+.skills-guide__ability {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-transform: none;
 }
 
 .skills-guide__entry dd {

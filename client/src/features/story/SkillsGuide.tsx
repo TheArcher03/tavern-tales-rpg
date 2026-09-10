@@ -1,4 +1,4 @@
-import type { SkillName } from '@tavern-tales/shared'
+import { SKILL_ABILITIES, type SkillName } from '@tavern-tales/shared'
 
 // Plain-English explanations for players new to D&D-style skill checks —
 // what each skill actually represents when a choice button names one,
@@ -37,12 +37,15 @@ export function SkillsGuide({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <p className="skills-guide__intro">
-          A choice may name a skill alongside its ability score — here's what each one actually covers.
+          Each skill is tied to one ability score — that's whose stat actually helps. A choice's tag on screen
+          already shows the acting character's real modifier for it.
         </p>
         <dl className="skills-guide__list">
           {SKILL_ORDER.map((skill) => (
             <div key={skill} className="skills-guide__entry">
-              <dt>{skill}</dt>
+              <dt>
+                {skill} <span className="skills-guide__ability">({SKILL_ABILITIES[skill]})</span>
+              </dt>
               <dd>{SKILL_DESCRIPTIONS[skill]}</dd>
             </div>
           ))}

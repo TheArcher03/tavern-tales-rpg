@@ -1066,8 +1066,34 @@ the check log (e.g. "vs DC 13").
   one shot at the end. Confirmed persistence survived a full dev-server
   restart (mid-session, unrelated to this pass) with the party exactly
   where it was left. Zero console errors on a fresh tab.
-- **Not yet committed** — same reasoning as the previous pass: this is a
-  UX/systems pass, not a campaign act, so it needs the user's go-ahead.
+- Committed and pushed as `da219ca`.
+
+### Follow-up: the Skills Guide wasn't actually the ask
+After playing with the Skills Guide, the user clarified what they'd
+actually wanted: not just a glossary of what each skill *means*, but a
+way to tell, at the moment of choosing, **which of my stats does this
+check use, and is it any good** — the glossary alone didn't answer that.
+Fixed two ways:
+- **The choice button tag now shows the real number**: `ChoiceButtons`'
+  `actorName?: string` became a richer `actor?: ChoiceActorInfo { name,
+  ability, modifier, proficient }` — the tag reads e.g. "KESSA · STR -1"
+  or "ORIN · INT +3 ★" (star = proficient), computed by a new
+  `buildActorInfo()` helper in `StoryShell.tsx` using the exact same math
+  `resolveCheck` itself uses (ability modifier + proficiency bonus if
+  proficient), so the tag can never show a number the actual roll
+  wouldn't back up.
+- **The Skills Guide now states each skill's governing ability** next to
+  its name (e.g. "Arcana (INT)"), reusing the existing `SKILL_ABILITIES`
+  mapping from `shared/src/skills.ts` rather than a second hardcoded
+  table — the two systems (button tag, glossary) draw from the same
+  source of truth, not independently-authored labels.
+- Verified live: created a Human Wizard with negative STR — confirmed the
+  granary-fight choice showed "KESSA · STR -1" before committing to it
+  (exactly the information the user needed to decide not to charge in
+  physically), confirmed a non-proficient Investigation/Perception check
+  showed no star, and confirmed the Skills Guide now lists each skill's
+  ability. Zero console errors, 86/86 tests, clean build.
+- Not yet committed — same reasoning as always: needs the user's go-ahead.
 
 ## Superseded: original Act 3 planning notes
 The section below was written when only Acts 1-2 existed and Act 3 was

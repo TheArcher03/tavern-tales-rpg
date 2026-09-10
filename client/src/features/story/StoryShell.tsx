@@ -22,7 +22,7 @@ import {
 } from '@tavern-tales/shared'
 import { PartyPanel } from './PartyPanel'
 import { StoryLog } from './StoryLog'
-import { ChoiceButtons } from './ChoiceButtons'
+import { ChoiceButtons, type ChoiceActorInfo } from './ChoiceButtons'
 import { StoryInterstitial } from './StoryInterstitial'
 import { LevelUpChoice } from './LevelUpChoice'
 import { ShopScreen } from './ShopScreen'
@@ -49,6 +49,19 @@ type PendingStep =
   | { kind: 'death'; name: string }
   | { kind: 'levelUp'; slot: PartySlot }
   | { kind: 'chapterBreak'; chapterBreak: ChapterBreak }
+
+// Previews who will actually act on an encounter choice and their real
+// modifier for it (ability modifier + proficiency bonus if proficient) —
+// the same math resolveCheck itself uses, so the tag never overstates or
+// understates what the roll will add. If the authored actor has died, this
+// already reflects the "no softlock" substitute (via resolveActingMember),
+// so the tag never names someone who can no longer act.
+function buildActorInfo(party: PartyState, choice: EncounterChoice): ChoiceActorInfo {
+  const actor = resolveActingMember(party, choice)
+  const proficient = choice.skill ? actor.skillProficiencies.includes(choice.skill) : false
+  const modifier = actor.abilityModifiers[choice.ability] + (proficient ? actor.proficiencyBonus : 0)
+  return { name: actor.name, ability: choice.ability, modifier, proficient }
+}
 
 interface PendingTransition {
   steps: PendingStep[]
@@ -279,10 +292,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
             <ChoiceButtons
               choices={availableChoices.map((choice) => ({
                 label: choice.label,
-                // Previews who will actually act — if the authored actor has
-                // died, this already reflects the "no softlock" substitute,
-                // so the tag never names someone who can no longer act.
-                actorName: scene.type === 'encounter' ? resolveActingMember(party, choice as EncounterChoice).name : undefined,
+                actor: scene.type === 'encounter' ? buildActorInfo(party, choice as EncounterChoice) : undefined,
               }))}
               onChoose={(label) => {
                 const choice = availableChoices.find((candidate) => candidate.label === label)

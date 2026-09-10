@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Campaign engine + Act 1 + Act 2 content built and verified live; Act 3 not yet written
+## Status: Full campaign complete (Acts 1-3, 4 distinct endings) — built and verified live end to end
 Date: 2026-09-10
 
 ## Tech stack (decided)
@@ -735,9 +735,10 @@ only, no reused plot/names/content). `shared/src/campaign/act2.ts`,
   10-14 range everywhere else) — win or lose that fight, Vesh retreats
   rather than the story dead-ending, consistent with the "abstracted,
   never blocks progress" pattern established in Act 1. A party-wide
-  `levelUp` milestone follows, then a temporary stub ending (`act2-end`)
-  standing in for Act 3's real opening, mirroring exactly how `act1-end`
-  worked before Act 2 existed.
+  `levelUp` milestone follows, then `act2-departure` hands off directly
+  into `act3-start` (updated once Act 3 was written — see below; at the
+  time Act 2 shipped this pointed at a temporary `act2-end` stub, same
+  pattern `act1-end` used before Act 2 existed).
 - **Test restructuring**: with two acts now cross-referencing each other's
   story flags and handing off across act boundaries, a single act's scene
   file is no longer a closed graph on its own — `findCampaignErrors`
@@ -751,27 +752,136 @@ only, no reused plot/names/content). `shared/src/campaign/act2.ts`,
   `activeCampaign.ts`. This is now the real check for every future act —
   Act 3 just needs to be added to `activeCampaign.ts` and this test
   automatically covers it, no new validation test required.
-- Shared suite is now 67/67 (6 net new tests: 3 replacing the old
-  `act1.test.ts` assertions, 3 new in `act2.test.ts`; `campaign.test.ts`'s
-  3 tests replace the reachability/error checks that used to live in
-  `act1.test.ts`).
-- Verified live end to end in the browser: played through Act 1's spy
-  branch into the interrogation side quest (setting `knowsRaiderCamp`),
-  confirmed the party-wide level-up (all four members to Level 2 with
-  individually different HP gains), then into Act 2 confirming **the
-  flag-gated shortcut route actually appears and works** (the direct
-  mechanical payoff for the earlier choice), all four hub spokes present
-  and the eavesdrop spoke's Umbral Scar/Umbrask lore reveal, the stealth
-  infiltration path, freeing Sella, the Vesh confrontation (lost this
-  roll — confirmed the "story continues either way" failure branch), the
-  second party-wide level-up (all four members to Level 3), and the
-  `act2-end` stub with the Cinderseal item in the shared treasury — zero
-  console errors throughout. Also confirmed a stale save from before Act 2
-  existed was correctly discarded on load by the `resolveInitialSave()`
-  guard from Act 1 (still doing its job on this second campaign swap).
+- At the time Act 2 shipped: shared suite was 67/67 (6 net new tests: 3
+  replacing the old `act1.test.ts` assertions, 3 new in `act2.test.ts`);
+  `campaign.test.ts`'s 3 tests replaced the reachability/error checks that
+  used to live in `act1.test.ts`. Superseded by the Act 3 numbers below —
+  `act2.test.ts` was revised again once Act 3 existed (see below).
+- Verified live end to end in the browser at the time: played through
+  Act 1's spy branch into the interrogation side quest (setting
+  `knowsRaiderCamp`), confirmed the party-wide level-up (all four members
+  to Level 2 with individually different HP gains), then into Act 2
+  confirming **the flag-gated shortcut route actually appears and works**
+  (the direct mechanical payoff for the earlier choice), all four hub
+  spokes present and the eavesdrop spoke's Umbral Scar/Umbrask lore
+  reveal, the stealth infiltration path, freeing Sella, the Vesh
+  confrontation (lost this roll — confirmed the "story continues either
+  way" failure branch), the second party-wide level-up (all four members
+  to Level 3), and the (then-temporary) `act2-end` stub with the
+  Cinderseal item in the shared treasury — zero console errors throughout.
+  Also confirmed a stale save from before Act 2 existed was correctly
+  discarded on load by the `resolveInitialSave()` guard from Act 1 (still
+  doing its job on this second campaign swap).
 
-## Next up: Act 3
-Per the agreed delivery sequence:
+### What's built — Act 3: "The Umbral Scar" (campaign finale)
+Original story (same commitment as Acts 1-2: structural pacing
+inspiration only, no reused plot/names/content), concluding the campaign.
+`shared/src/campaign/act3.ts`, **51 scenes** — the largest act, matching
+Acts 1-2's density with room for the climax's extra branching.
+`act2-departure` now hands off directly to `act3-start`; all three acts
+are merged in `activeCampaign.ts`
+(`{ ...ACT1_SCENES, ...ACT2_SCENES, ...ACT3_SCENES }`).
+
+- **Story**: the party reaches the Umbral Scar, where the Ashen Circle is
+  about to complete a ritual seating all three seals (the Cinderseal
+  recovered in Act 2, plus two more the Circle already held) to wake
+  Umbrask — described deliberately as a vast, ancient elemental force
+  ("a shape of root and ember"), not a dragon, to stay clearly clear of
+  the reference module's own specific creature. Whether the party stops
+  the ritual in time, and what they choose to do with Vesh once she's
+  finally cornered, together determine which of **four distinct
+  endings** the campaign resolves to — the payoff for "3-4 distinct
+  endings" from the user's original request, reached through explicit
+  narrative choices rather than any new engine mechanism (the engine
+  can't gate on raw alignment values, only story flags, so endings fork
+  on concrete decisions instead — alignment still shifts throughout and
+  colors the prose, it just isn't the gating mechanism).
+- **Structure**: three route choices into the Scar (causeway / cliff
+  paths / open trail), each a two-layer encounter arc matching Acts 1-2's
+  density, converge on a staging point. A four-spoke hub (scout the
+  ritual / free conscripted Millhaven captives — a direct callback to
+  Act 1's raid — / sabotage the ritual wards / find Meva, a defecting
+  cultist met only via the open-trail route) offers preparation before
+  the party commits. **The sabotage-wards spoke gates a second, much
+  easier approach at the ritual confrontation itself** (DC 12 vs. DC 16
+  for the direct approach) — the clearest, most immediate mechanical
+  payoff for hub-spoke prep in the whole campaign, verified live. Success
+  at the ritual confrontation branches to a final duel with Vesh
+  (`act3-vesh-final`); **failure branches to a genuinely different final
+  confrontation** (`act3-umbrask-stirs` → `act3-vesh-desperate`) against
+  a half-woken Umbrask instead — not just a worse version of the same
+  scene, a different climax entirely, both funneling into their own
+  distinct endings. Win or lose the Vesh duel, both converge on
+  `act3-vesh-choice`, a pure narrative choice (no dice) offering three
+  paths: strike her down (→ *Umbrask Bound Anew*), let her go
+  (→ *The Circle Broken, the Captain Spared*), or hear out her offer of a
+  bargain, which itself forks into accepting (→ *The Ashen Circle's New
+  Voice* — the dark ending) or refusing (→ back to the mercy ending, with
+  its own short acknowledgment scene rather than silently reusing the
+  same text). The ritual-failure branch leads to its own ending,
+  *Umbrask Wakes* — bittersweet rather than a clean loss, consistent with
+  the "never truly dead-ends" pattern the whole campaign has kept since
+  Act 1.
+- **Test restructuring, round two**: `act2.test.ts` was updated again (the
+  `act2-end` stub assertion replaced with a hand-off-to-`act3-start`
+  assertion, matching the same change made to `act1.test.ts` when Act 2
+  was added), a new `act3.test.ts` added (start scene shape, the
+  wardsWeakened DC-gating assertion, the Meva conditional-spoke assertion,
+  the four-distinct-endings assertion, the three-way Vesh-choice
+  assertion), and `campaign.test.ts`'s ending-count assertion was updated
+  from "exactly one, the temporary stub" to "exactly four, by id" plus a
+  new check that every ending has a distinct title.
+- Shared suite is now 74/74.
+- Verified live end to end in the browser: a full three-act playthrough
+  in one session — Act 1 (rally-the-militia branch) → Act 2 (deep-woods
+  route, stealth infiltration, Vesh fight lost but still progressed) →
+  Act 3 (open-trail route, the Meva check failed so her hub spoke
+  correctly did **not** appear, the sabotage-wards spoke succeeded and
+  the resulting DC-12 "exploit the wards" option correctly appeared and
+  was used at the ritual confrontation, the Vesh duel was lost but still
+  converged into the fate choice, "hear her out" → "accept" →
+  **"The Ashen Circle's New Voice"** ending, confirmed by the 🏁 ending
+  title appearing in the log and "The story ends here."). Zero console
+  errors across the entire three-act run. Also confirmed the negative
+  case for two different conditional gates (the Act 2 shortcut route
+  correctly absent without `knowsRaiderCamp`; the Act 3 Meva spoke
+  correctly absent without `metMeva`) — condition-gating verified working
+  in both directions, not just the positive case.
+
+## Where this leaves the project
+**The full campaign is complete**: three acts, roughly 142 authored
+scenes total (41 + 50 + 51), four distinct endings, a working
+free-to-run replacement for the live-AI-DM mode with zero runtime API
+cost. Every act has been played through live in the browser at least
+once, and `campaign.test.ts` guards the whole merged graph against
+dangling links and unreachable scenes on every future edit.
+
+**Pacing**: per the user's ~2+ hour total target (see the
+`project-campaign-target-length` memory for the full reasoning), the
+three acts combined are sized consistently (~40-50 scenes each) and
+should land in the neighborhood of the target, though this hasn't been
+timed with a real, unhurried playthrough — the live verification passes
+in this project have all been rapid test-clicking, not paced reading.
+Worth a real timed playthrough before considering pacing fully settled.
+
+**Next steps are the user's, not a remaining build task**: the user has
+said they want to personally adjust, rewrite, or rework parts of the game
+once they've played through all three acts themselves. Candidates worth
+flagging if asked, not started unprompted:
+- A real, unhurried playthrough to sanity-check pacing against the 2+
+  hour target and catch any prose/continuity issues test coverage can't.
+- `shared/src/campaign/prototype.ts` is still in the repo, used only as a
+  stable fixture for `engine.test.ts` — not part of the shipped campaign,
+  fine to leave as-is or remove if ever considered clutter.
+- The live-DM mode (`server/`, `dmClient.ts`, `FreeTextInput.tsx`, the old
+  `CharacterSheet.tsx`) remains in the repo, untouched and dormant, per
+  the earlier confirmed decision to keep it rather than delete it.
+
+## Superseded: original Act 3 planning notes
+The section below was written when only Acts 1-2 existed and Act 3 was
+still unplanned. Kept for historical context; superseded by the "What's
+built — Act 3" section above.
+
 1. **Act 3** (climax at the Umbral Scar, paying off "waking Umbrask" and
    the three-seals setup from Act 2's eavesdrop spoke) + **3-4 distinct
    endings**, varying by which choices/flags/alignment the party carried

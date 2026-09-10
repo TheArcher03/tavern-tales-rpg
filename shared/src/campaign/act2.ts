@@ -14,10 +14,9 @@ import type { Campaign } from './types.js'
 // spokes before the party commits to infiltrating. A story flag set back
 // in Act 1 (`knowsRaiderCamp`, from the interrogation side quest) unlocks
 // a fourth, faster route here — the payoff for that earlier choice. The
-// final scene, `act2-departure`, hands off to `act2-end`, a temporary stub
-// (same pattern Act 1 used) that becomes Act 3's real opening scene once
-// that's written; full graph validation lives in `campaign.test.ts` against
-// the merged `ACTIVE_CAMPAIGN`.
+// final scene, `act2-departure`, hands off directly to `act3-start` in
+// act3.ts; full graph validation lives in `campaign.test.ts` against the
+// merged `ACTIVE_CAMPAIGN`.
 export const ACT2_SCENES: Campaign = {
   'act2-start': {
     type: 'narration',
@@ -891,17 +890,10 @@ export const ACT2_SCENES: Campaign = {
       'Cinderseal is one of three wards laid over something called Umbrask at a place called the Umbral Scar, deep in ' +
       'the oldest part of the Thornwood. The Ashen Circle already means to go there — with or without this seal. ' +
       '"If they raise the other two anyway," Sella says quietly, "we\'d rather be there when it happens than not."',
-    choices: [{ label: 'Set out for the Umbral Scar', next: 'act2-end' }],
-  },
-
-  // TEMPORARY STUB — replaced by Act 3's real opening scene once written
-  // (mirrors the act1-end stub Act 1 used before Act 2 existed).
-  'act2-end': {
-    type: 'ending',
-    id: 'act2-end',
-    title: 'End of Act 2 (preview)',
-    narration:
-      'The party leaves the ruined raider camp behind and sets out deeper into the Thornwood, toward the Umbral Scar. ' +
-      '(Act 3 picks up here — this preview stops for now.)',
+    // Hands off directly into Act 3's opening scene (shared/src/campaign/act3.ts).
+    // The three acts are merged into one Campaign graph in activeCampaign.ts, so
+    // this cross-act reference resolves once all three are combined; graph
+    // validation for the full merged campaign lives in campaign.test.ts.
+    choices: [{ label: 'Set out for the Umbral Scar', next: 'act3-start' }],
   },
 }

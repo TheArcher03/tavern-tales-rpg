@@ -12,8 +12,8 @@ import type { Campaign } from './types.js'
 // optional investigation "spokes" — each a short encounter that loops back
 // to the hub, with a story flag hiding it once completed (the engine's
 // SceneCondition gating, exercised here for the first time in real
-// content) — before the party commits to leaving. `act1-end` is a
-// temporary stub; it becomes Act 2's real opening scene once that's written.
+// content) — before the party commits to leaving. The final scene,
+// `act1-departure`, hands off directly to `act2-start` in act2.ts.
 export const ACT1_SCENES: Campaign = {
   'act1-start': {
     type: 'narration',
@@ -616,16 +616,10 @@ export const ACT1_SCENES: Campaign = {
       'By torchlight you follow the raiders\' trail to the edge of the Thornwood, where the tracks turn north into country ' +
       'none of you know. Somewhere ahead of you, Vesh and the Ashen Circle are carrying an old woman and an older relic ' +
       'toward something called Umbrask. Whatever that is, you\'re about to find out.',
-    choices: [{ label: 'Cross into the Thornwood', next: 'act1-end' }],
-  },
-
-  // TEMPORARY STUB — replaced by Act 2's real opening scene id once written.
-  'act1-end': {
-    type: 'ending',
-    id: 'act1-end',
-    title: 'End of Act 1 (preview)',
-    narration:
-      'The party leaves Millhaven behind and follows the Ashen Circle\'s trail into the Thornwood. ' +
-      '(Act 2 picks up here — this preview stops for now.)',
+    // Hands off directly into Act 2's opening scene (shared/src/campaign/act2.ts).
+    // The two acts are merged into one Campaign graph in activeCampaign.ts, so
+    // this cross-act reference resolves once both files are combined; graph
+    // validation for the full merged campaign lives in campaign.test.ts.
+    choices: [{ label: 'Cross into the Thornwood', next: 'act2-start' }],
   },
 }

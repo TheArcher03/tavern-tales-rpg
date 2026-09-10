@@ -3,7 +3,7 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: Campaign engine + expanded Act 1 content built and verified live; Act 2 not yet written
+## Status: Campaign engine + Act 1 + Act 2 content built and verified live; Act 3 not yet written
 Date: 2026-09-10
 
 ## Tech stack (decided)
@@ -699,23 +699,102 @@ plot/names/content from the reference module). `shared/src/campaign/act1.ts`,
 - `.claude/launch.json` added (client dev server, port 5173) so future
   sessions can preview the app via the Browser tool without recreating it.
 
-## Next up: Act 2
+### What's built — Act 2: "Into the Thornwood"
+Original story (same commitment as Act 1: structural pacing inspiration
+only, no reused plot/names/content). `shared/src/campaign/act2.ts`,
+**50 scenes** — the largest act yet, matching Act 1's expanded density.
+`act1-departure` (Act 1's final scene) now hands off directly to
+`act2-start`; the two acts are merged in `activeCampaign.ts`
+(`{ ...ACT1_SCENES, ...ACT2_SCENES }`).
+
+- **Story**: the party tracks the Ashen Circle through the Thornwood to
+  their camp, scouts it, infiltrates, frees Old Sella, recovers the
+  Cinderseal, and confronts Vesh directly for the first time (she retreats
+  rather than being defeated outright — a recurring antagonist, not a
+  one-fight villain). The eavesdrop side quest pays off "waking Umbrask"
+  from Act 1: the Cinderseal is one of **three** seals on something called
+  Umbrask, bound at a place called the Umbral Scar deeper in the
+  Thornwood — this camp was only a waypoint, seeding Act 3's destination
+  and stakes explicitly.
+- **Structure**: three route choices through the Thornwood (mire / ridge /
+  deep woods), each — like Act 1's three opening approaches — a two-layer
+  encounter arc (an initial hazard, then a distinct complication) before
+  converging on a camp sighting. **A fourth route is flag-gated on Act 1's
+  `knowsRaiderCamp`** (set by successfully interrogating the wounded raider
+  back in Millhaven): using the map fragment skips both hazard layers
+  entirely and grants bonus gold — a concrete, mechanical payoff for an
+  optional Act 1 choice carrying forward into Act 2, not just a flavor
+  callback. All routes converge on `act2-hub`, a four-spoke investigation
+  hub (scout the perimeter / free a captive named Rell / sabotage supplies
+  / eavesdrop on Vesh) using the same flag-gated loop-back pattern Act 1
+  established — freeing Rell is this act's equivalent side quest, complete
+  with its own alignment-shift reward for freeing a captive with nothing
+  to gain from it. From the hub, the party chooses a stealth or frontal
+  infiltration approach, both converging on freeing Sella and then
+  confronting Vesh directly (the act's highest-DC encounter, 15 vs. the
+  10-14 range everywhere else) — win or lose that fight, Vesh retreats
+  rather than the story dead-ending, consistent with the "abstracted,
+  never blocks progress" pattern established in Act 1. A party-wide
+  `levelUp` milestone follows, then a temporary stub ending (`act2-end`)
+  standing in for Act 3's real opening, mirroring exactly how `act1-end`
+  worked before Act 2 existed.
+- **Test restructuring**: with two acts now cross-referencing each other's
+  story flags and handing off across act boundaries, a single act's scene
+  file is no longer a closed graph on its own — `findCampaignErrors`
+  against `ACT1_SCENES` alone would now flag the deliberate `act2-start`
+  cross-reference as dangling. `act1.test.ts` and `act2.test.ts` were
+  trimmed to lightweight per-act sanity checks (start scene shape, the
+  handoff choice's target, the gating condition on the shortcut route),
+  and a new **`shared/src/campaign/campaign.test.ts`** became the
+  canonical structural gate: `findCampaignErrors`/`findUnreachableScenes`/
+  ending-count, run against the full merged `ACTIVE_CAMPAIGN` via
+  `activeCampaign.ts`. This is now the real check for every future act —
+  Act 3 just needs to be added to `activeCampaign.ts` and this test
+  automatically covers it, no new validation test required.
+- Shared suite is now 67/67 (6 net new tests: 3 replacing the old
+  `act1.test.ts` assertions, 3 new in `act2.test.ts`; `campaign.test.ts`'s
+  3 tests replace the reachability/error checks that used to live in
+  `act1.test.ts`).
+- Verified live end to end in the browser: played through Act 1's spy
+  branch into the interrogation side quest (setting `knowsRaiderCamp`),
+  confirmed the party-wide level-up (all four members to Level 2 with
+  individually different HP gains), then into Act 2 confirming **the
+  flag-gated shortcut route actually appears and works** (the direct
+  mechanical payoff for the earlier choice), all four hub spokes present
+  and the eavesdrop spoke's Umbral Scar/Umbrask lore reveal, the stealth
+  infiltration path, freeing Sella, the Vesh confrontation (lost this
+  roll — confirmed the "story continues either way" failure branch), the
+  second party-wide level-up (all four members to Level 3), and the
+  `act2-end` stub with the Cinderseal item in the shared treasury — zero
+  console errors throughout. Also confirmed a stale save from before Act 2
+  existed was correctly discarded on load by the `resolveInitialSave()`
+  guard from Act 1 (still doing its job on this second campaign swap).
+
+## Next up: Act 3
 Per the agreed delivery sequence:
-1. **Act 2** (mirrors "track the raiders back to their camp") — should
-   check the `knowsRaiderCamp` flag Act 1 already sets (from the
-   interrogation side quest) to offer a shortcut/bonus path; needs a
-   second side quest that also loops back into its main branch. Replaces
-   `act1-end` as Act 1's real handoff point (the stub's id, `act1-end`,
-   should become Act 2's first scene id, or Act 1's milestone scene should
-   point at Act 2's real first scene — either way, `findCampaignErrors`/
-   `findUnreachableScenes` against the merged campaign will catch it if
-   this is done wrong).
-2. Act 3 (climax — presumably where "waking Umbrask" pays off) + 3–4
-   distinct endings.
-3. Wire remaining side quests, full playthrough pass, replace
+1. **Act 3** (climax at the Umbral Scar, paying off "waking Umbrask" and
+   the three-seals setup from Act 2's eavesdrop spoke) + **3-4 distinct
+   endings**, varying by which choices/flags/alignment the party carried
+   forward (e.g. whether Vesh was ever truly defeated, whether the second
+   and third seals were secured or lost, alignment extremes). Should be
+   sized at Act 1/Act 2's scale (40-50 scenes) per the pacing target below.
+   `act2-departure` currently hands off to `act2-end`, a temporary stub
+   (same pattern `act1-end` used before Act 2 existed) — Act 3's real
+   opening scene should be `act3-start`, and `act2-end` gets removed the
+   same way `act1-end` was.
+2. Wire remaining side quests, full playthrough pass, replace
    `PROTOTYPE_CAMPAIGN` usage in tests if desired (or keep it as the
    engine fixture — it's not part of the shipped campaign either way),
-   update `activeCampaign.ts` to merge all three acts.
+   update `activeCampaign.ts` to merge all three acts, update
+   `campaign.test.ts`'s ending-scene-id assertion once Act 3 has its own
+   real endings instead of a stub.
+3. **Pacing check-in**: Acts 1+2 combined are now ~91 scenes with a
+   played-path length of roughly 35-45 scene transitions depending on
+   route/hub choices — likely landing in the 30-45 minute real-playtime
+   range for two of three acts. See `project-campaign-target-length`
+   memory for the running estimate against the user's ~2+ hour total
+   target; Act 3 should aim for a comparable or slightly longer share
+   (it's the climax) rather than a shorter wrap-up.
 
 ## Notes for future sessions / continuity
 - This file should be updated at the end of every work session with what

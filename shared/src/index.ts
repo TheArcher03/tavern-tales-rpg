@@ -18,6 +18,7 @@ export * from './campaign/partyState.js'
 export * from './campaign/engine.js'
 export * from './campaign/companion.js'
 export * from './campaign/act1.js'
+export * from './campaign/act2.js'
 // Not the active campaign — kept as a stable engine-test fixture. See its own comment.
 export * from './campaign/prototype.js'
 export * from './campaign/activeCampaign.js'

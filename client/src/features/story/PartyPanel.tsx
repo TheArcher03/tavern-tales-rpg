@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ABILITY_NAMES, alignmentLabel, getCharacterClass, getRace, type Character, type PartyState } from '@tavern-tales/shared'
+import { ClassIcon } from './ClassIcon'
 
 function formatModifier(modifier: number): string {
   return modifier >= 0 ? `+${modifier}` : `${modifier}`
@@ -27,6 +28,7 @@ function LivingMemberCard({ member, expanded, onToggle }: { member: Character; e
         onClick={onToggle}
         aria-expanded={expanded}
       >
+        <ClassIcon classId={member.classId} className="party-panel__member-icon" />
         <h3 className="party-panel__member-name">
           {member.name}
           {member.role === 'companion' && <span className="party-panel__companion-tag">Companion</span>}

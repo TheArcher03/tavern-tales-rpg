@@ -28,6 +28,8 @@ import { LevelUpChoice } from './LevelUpChoice'
 import { ShopScreen } from './ShopScreen'
 import { DiceRollReveal } from './DiceRollReveal'
 import { SkillsGuide } from './SkillsGuide'
+import { cancelNarration, isNarrationSupported, speak } from './narration'
+import { loadNarrationEnabled, saveNarrationEnabled } from '../persistence/narrationSettings'
 import './StoryShell.css'
 
 interface StoryShellProps {
@@ -79,6 +81,41 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
   const [initialChapterBreak, setInitialChapterBreak] = useState<ChapterBreak | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
   const [showSkillsGuide, setShowSkillsGuide] = useState(false)
+  const [narrationEnabled, setNarrationEnabled] = useState(loadNarrationEnabled)
+
+  // Tracks which log entries have already been read aloud. Lives here
+  // (not in StoryLog) because StoryLog itself unmounts and remounts every
+  // time a dice-roll/death/level-up/chapter-break step is shown — a ref in
+  // StoryLog would reset each time and re-narrate the whole backlog.
+  const narratedLogIdsRef = useRef<Set<string>>(new Set())
+  const hasSeededNarrationRef = useRef(false)
+
+  useEffect(() => {
+    if (!hasSeededNarrationRef.current) {
+      hasSeededNarrationRef.current = true
+      if (entries.length > 0) {
+        // Resuming a save with existing history — none of it is new, don't replay it.
+        for (const entry of entries) narratedLogIdsRef.current.add(entry.id)
+        return
+      }
+    }
+    for (const entry of entries) {
+      if (narratedLogIdsRef.current.has(entry.id)) continue
+      narratedLogIdsRef.current.add(entry.id)
+      if (!narrationEnabled) continue
+      if (entry.speaker === 'dm') speak(entry.text, 'dm')
+      else if (entry.speaker === 'system') speak(entry.text, 'system')
+    }
+  }, [entries, narrationEnabled])
+
+  const toggleNarration = () => {
+    setNarrationEnabled((current) => {
+      const next = !current
+      saveNarrationEnabled(next)
+      if (!next) cancelNarration()
+      return next
+    })
+  }
 
   useEffect(() => {
     // Guards against StrictMode's dev-only double-invoke of mount effects,
@@ -228,6 +265,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
             subtitle={initialChapterBreak.completedTitle}
             body={initialChapterBreak.enteringSubtitle}
             onContinue={dismissInitialChapterBreak}
+            narrate={narrationEnabled}
           />
         </main>
       </div>
@@ -258,6 +296,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
               title={`${pendingStep.name} has fallen.`}
               body="Whatever waits ahead, it waits for one fewer than it expected."
               onContinue={advancePending}
+              narrate={narrationEnabled}
             />
           )}
           {pendingStep.kind === 'levelUp' && (
@@ -270,6 +309,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
               subtitle={pendingStep.chapterBreak.completedTitle}
               body={pendingStep.chapterBreak.enteringSubtitle}
               onContinue={advancePending}
+              narrate={narrationEnabled}
             />
           )}
         </main>
@@ -304,12 +344,24 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
           </>
         )}
         <div className="story-shell__footer-links">
-          <button type="button" className="story-shell__new-game" onClick={onStartNewGame}>
+          <button
+            type="button"
+            className="story-shell__new-game"
+            onClick={() => {
+              cancelNarration()
+              onStartNewGame()
+            }}
+          >
             Start a new adventure
           </button>
           <button type="button" className="story-shell__skills-toggle" onClick={() => setShowSkillsGuide(true)}>
             Skills Guide
           </button>
+          {isNarrationSupported() && (
+            <button type="button" className="story-shell__skills-toggle" onClick={toggleNarration}>
+              {narrationEnabled ? '🔊 Narration on' : '🔇 Narration off'}
+            </button>
+          )}
         </div>
       </main>
       {showSkillsGuide && <SkillsGuide onClose={() => setShowSkillsGuide(false)} />}

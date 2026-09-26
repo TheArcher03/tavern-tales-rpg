@@ -3,8 +3,8 @@
 Read this file first in any new session before doing more work — it's the
 single source of truth for what's done and what's next.
 
-## Status: UX polish pass (auto-scroll, skills guide, party-wide leveling, title screen, dice animation) — built and verified live; not yet committed
-Date: 2026-09-11
+## Status: Live at GitHub Pages; class-icon visuals + free browser narration built and verified live; not yet committed
+Date: 2026-09-26
 
 ## Tech stack (decided)
 - **Client**: Vite + React + TypeScript (`client/`)
@@ -1093,7 +1093,115 @@ Fixed two ways:
   physically), confirmed a non-proficient Investigation/Perception check
   showed no star, and confirmed the Skills Guide now lists each skill's
   ability. Zero console errors, 86/86 tests, clean build.
-- Not yet committed — same reasoning as always: needs the user's go-ahead.
+- Committed and pushed as `8516973`.
+
+## Deployment: GitHub Pages
+The user wanted to send the game to a friend for feedback. Since the
+campaign mode makes zero runtime API calls, it's fully static — a natural
+fit for a free host rather than needing a real server.
+
+- Made the repo public (user's own action — repo visibility isn't
+  something to change without going through the account owner directly)
+  and added `.github/workflows/deploy-pages.yml`: builds `shared` then
+  `client` and deploys `client/dist` to GitHub Pages automatically on
+  every push to `main`, via the standard `actions/{configure-pages,
+  upload-pages-artifact,deploy-pages}` pattern. Only the client (+ its
+  shared dependency) is built — the dormant live-DM server workspace
+  isn't part of a static deploy.
+- `client/vite.config.ts`'s `base` is now `/tavern-tales-rpg/` for
+  production builds only (`command === 'build'`), matching the
+  project-site path GitHub Pages serves from; local dev (`npm run dev`)
+  stays at root, unaffected.
+- Also requires enabling Pages itself in the repo's Settings → Pages →
+  Source → GitHub Actions — another one-time manual step, done live with
+  the user watching the first deploy fail (Pages not yet enabled) and
+  succeed after enabling it and re-running the job.
+- Live at **https://thearcher03.github.io/tavern-tales-rpg/** — verified
+  a full character-creation flow there matches the local dev build
+  exactly, zero console errors. Each person who opens the link gets a
+  fully independent playthrough (state lives in that browser's own
+  localStorage, nothing shared or synced) — confirmed this explicitly
+  for the user since it wasn't obvious upfront.
+- Committed and pushed as `4b21abc`.
+
+## Phase 1 of a 3-part feedback request: icons + free narration
+After playing the deployed build, the user asked for three things: more
+visual imagery (party portraits, scenes, action art), a real depleting-HP
+combat visualization, and voice narration with per-speaker voices. Given
+very different feasibility/cost profiles, the recommendation (confirmed
+with the user) was to split this into phases:
+1. **Now**: a lightweight SVG icon system (no art tooling available in
+   this environment) + free browser-based narration (no TTS API, matches
+   "costs nothing to run"). Both done, see below.
+2. **Later**: real illustrated art, once the user sources image files —
+   capped by tooling, not effort, so explicitly deferred until the user
+   has assets to hand over.
+3. **Later**: a real multi-round HP-bar combat system for the handful of
+   climactic boss fights specifically (not a rework of every abstracted
+   encounter) — a genuine second combat system, scoped as its own future
+   build once phases 1-2 are settled.
+
+### Class icons (no art assets needed)
+`ClassIcon.tsx` (new, `client/src/features/story/`) — simple filled/
+stroked SVG emblems, one per core class (sword/wizard hat/dagger/holy
+cross for fighter/wizard/rogue/cleric), using `currentColor` so they
+follow the theme automatically in light/dark. Wired into `PartyPanel`
+(each party member's header), `CharacterCreationForm` (a live preview
+next to the Class dropdown), and `PartyCreation`'s roster-reveal step.
+**Bug found and fixed during live verification**: the first fighter/rogue
+glyphs were stroked-outline paths (a sword slash, a dagger skeleton) that
+read ambiguously at badge size — the rogue one in particular looked like
+an hourglass rather than a blade. Redesigned both as solid filled
+silhouettes (a triangular sword blade, a diamond-bladed dagger) instead of
+stroked line art, which read clearly at the same size; wizard's hat and
+cleric's cross (already simple enough shapes) were left as strokes.
+
+### Free browser-based narration
+`narration.ts` (new) wraps the Web Speech API (`window.speechSynthesis`)
+— zero cost, zero server, degrades silently wherever unsupported. Two
+roles get audibly distinct treatment: `dm` (scene narration, rate 0.95)
+and `system` (dice-roll/effect log lines, rate 1.05, pitch 1.15), using
+different browser voices where more than one is available. True per-NPC
+voice switching (e.g. a distinct voice when a named character's quoted
+dialogue appears mid-narration) was explicitly scoped out — the prose
+doesn't carry a speaker tag for that, and detecting it via text-parsing
+would be fragile; voice varies at the `StoryEntry.speaker` level instead.
+- The player's own echoed choice text is deliberately never narrated
+  (redundant — they just clicked it).
+- A `🔊/🔇 Narration` toggle in the footer persists to its own
+  localStorage key (`narrationSettings.ts`, deliberately separate from
+  `GameSave` — a device preference, not game state) and immediately
+  cancels any in-flight speech when turned off.
+- Tracking of "which log entries have already been read aloud" lives in
+  `StoryShell` (a ref), not `StoryLog` — `StoryLog` itself unmounts and
+  remounts every time a dice-roll/death/level-up/chapter-break
+  interstitial is shown, so a ref inside it would reset constantly and
+  replay the whole backlog. Resuming a save marks all pre-existing
+  entries as already-heard without speaking them; only new entries from
+  that point on are narrated. Toggling narration off and back on doesn't
+  retroactively speak whatever accumulated while muted, either — entries
+  are marked "seen" regardless of whether they were actually spoken.
+- **Bug found and fixed during live verification**: the very first
+  chapter-break splash (Act I's own opening) spoke twice. Root cause was
+  React StrictMode's dev-only double-invoke of mount effects — the same
+  class of bug this project has hit before, fixed the same established
+  way (a `hasSpokenRef` guard in `StoryInterstitial`, mirroring
+  `StoryShell`'s own `hasStartedRef` pattern). Production builds were
+  never affected (StrictMode's double-invoke is dev-only), but the local
+  dev experience was, so it's fixed regardless.
+- Verified live end to end: intercepted `speechSynthesis.speak()` calls
+  via injected JS (since audio can't literally be listened to through
+  this tooling) to confirm, in order: the chapter-break splash speaks
+  once (not twice, post-fix); the opening scene narration speaks
+  correctly even though it's gated behind that same splash; an encounter
+  choice's check-log and effect lines speak with the distinct
+  system-voice pitch/rate; the player's own choice-echo text never
+  appears in the spoken log; muting stops new speech immediately;
+  un-muting doesn't replay the backlog that accumulated while muted; and
+  narration resumes correctly for genuinely new entries afterward. Zero
+  console errors, 86/86 tests (client-only change, shared suite
+  unaffected), clean build.
+- Not yet committed — needs the user's go-ahead, same as always.
 
 ## Superseded: original Act 3 planning notes
 The section below was written when only Acts 1-2 existed and Act 3 was

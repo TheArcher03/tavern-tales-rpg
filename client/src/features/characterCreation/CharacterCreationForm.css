@@ -22,6 +22,21 @@
   color: var(--color-danger);
 }
 
+.character-creation__class-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.character-creation__class-row select {
+  flex: 1;
+}
+
+.character-creation__class-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
 .ability-allocator__budget {
   margin-bottom: 0.5rem;
   color: var(--color-text-muted);

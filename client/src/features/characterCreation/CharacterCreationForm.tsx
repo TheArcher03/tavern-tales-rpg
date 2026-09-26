@@ -12,6 +12,7 @@ import {
   type Character,
 } from '@tavern-tales/shared'
 import { AbilityScoreAllocator } from './AbilityScoreAllocator'
+import { ClassIcon } from '../story/ClassIcon'
 import './CharacterCreationForm.css'
 
 function defaultAbilityScores(): AbilityScores {
@@ -75,13 +76,16 @@ export function CharacterCreationForm({ onCreate }: CharacterCreationFormProps) 
 
       <label className="character-creation__field">
         Class
-        <select value={classId} onChange={(event) => setClassId(event.target.value)}>
-          {CHARACTER_CLASSES.map((characterClass) => (
-            <option key={characterClass.id} value={characterClass.id}>
-              {characterClass.name}
-            </option>
-          ))}
-        </select>
+        <div className="character-creation__class-row">
+          <ClassIcon classId={classId} className="character-creation__class-icon" />
+          <select value={classId} onChange={(event) => setClassId(event.target.value)}>
+            {CHARACTER_CLASSES.map((characterClass) => (
+              <option key={characterClass.id} value={characterClass.id}>
+                {characterClass.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </label>
 
       <label className="character-creation__field">

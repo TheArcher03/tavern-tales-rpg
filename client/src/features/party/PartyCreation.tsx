@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPartyState, generateCompanion, getCharacterClass, type Character, type PartyState } from '@tavern-tales/shared'
 import { CharacterCreationForm } from '../characterCreation/CharacterCreationForm'
+import { ClassIcon } from '../story/ClassIcon'
 import './PartyCreation.css'
 
 const COMPANION_NAMES = ['Brenna', 'Osric', 'Talia', 'Corwin', 'Elowen', 'Garrick', 'Ysolde', 'Thane', 'Maren', 'Dorin']
@@ -65,15 +66,19 @@ export function PartyCreation({ startingSceneId, onReady }: PartyCreationProps) 
       <h1>Your party is complete</h1>
       <ul className="party-creation__roster">
         <li>
+          <ClassIcon classId={pc1.classId} className="party-creation__roster-icon" />
           <strong>{pc1.name}</strong> — your character
         </li>
         <li>
+          <ClassIcon classId={pc2.classId} className="party-creation__roster-icon" />
           <strong>{pc2.name}</strong> — your character
         </li>
         <li>
+          <ClassIcon classId={companion1.classId} className="party-creation__roster-icon" />
           <strong>{companion1.name}</strong> joins you, a level {companion1.level} {getCharacterClass(companion1.classId).name}
         </li>
         <li>
+          <ClassIcon classId={companion2.classId} className="party-creation__roster-icon" />
           <strong>{companion2.name}</strong> joins you, a level {companion2.level} {getCharacterClass(companion2.classId).name}
         </li>
       </ul>

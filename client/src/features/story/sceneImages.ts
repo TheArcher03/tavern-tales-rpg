@@ -28,6 +28,22 @@ export const CHAPTER_BACKDROPS: Record<string, string> = {
   'act3-start': umbralScarRitualSite,
 }
 
+// A persistent backdrop behind the whole narration/choices screen, keyed
+// by act number and derived from the scene id's "act1-"/"act2-"/"act3-"
+// prefix — every scene in an act shares one backdrop, changing only when
+// the player crosses into the next act (dice rolls and other interstitial
+// steps intentionally don't use this; they render their own screen).
+export const ACT_BACKDROPS: Record<number, string> = {
+  1: millhavenAtNight,
+  2: thornwoodPath,
+  3: umbralScarRitualSite,
+}
+
+export function actNumberForScene(sceneId: string): number | undefined {
+  const match = /^act(\d+)-/.exec(sceneId)
+  return match ? Number(match[1]) : undefined
+}
+
 // Inline illustrations shown alongside the current scene's narration —
 // each keyed to the one scene where that creature/NPC/moment is first
 // properly introduced, not every scene that goes on to mention them.

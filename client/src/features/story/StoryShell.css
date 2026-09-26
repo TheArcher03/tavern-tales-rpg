@@ -98,8 +98,40 @@
   min-width: 0;
 }
 
+/* A persistent per-act scenic backdrop behind narration/choices. Message
+   bubbles and buttons already paint their own opaque backgrounds, so the
+   backdrop only ever shows through the gaps between them — the ::before
+   scrim just keeps those gaps from getting too bright/busy. */
+.story-shell__main--with-backdrop {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  isolation: isolate;
+}
+
+.story-shell__main--with-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 8, 6, 0.55), rgba(10, 8, 6, 0.7));
+  pointer-events: none;
+  z-index: 0;
+}
+
+.story-shell__main--with-backdrop > * {
+  position: relative;
+  z-index: 1;
+}
+
 .story-log {
   flex: 1;
+  /* Flex items default to a min-height equal to their content's natural
+     height, which defeats "flex: 1 + overflow-y: auto" — without this the
+     log refuses to shrink to fit the available space, so it (and the
+     image/choices below it) overflow the fixed-height story-shell instead
+     of scrolling internally, and older messages become unreachable. */
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -137,16 +169,24 @@
 
 .scene-image {
   flex-shrink: 0;
+  display: flex;
+  justify-content: center;
   border-radius: 0.6rem;
   border: 1px solid var(--color-border);
   overflow: hidden;
   max-width: 28rem;
+  /* Bounded so a tall portrait-orientation image can never dominate the
+     viewport and push the log/choices out of reach — width still scales
+     down to fit, this only clamps how tall it's allowed to get. */
+  max-height: 45vh;
 }
 
 .scene-image img {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
+  max-width: 100%;
+  max-height: 45vh;
 }
 
 .story-shell__loading {

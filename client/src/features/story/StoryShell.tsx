@@ -29,7 +29,7 @@ import { ShopScreen } from './ShopScreen'
 import { DiceRollReveal } from './DiceRollReveal'
 import { SkillsGuide } from './SkillsGuide'
 import { SceneImage } from './SceneImage'
-import { CHAPTER_BACKDROPS } from './sceneImages'
+import { ACT_BACKDROPS, CHAPTER_BACKDROPS, actNumberForScene } from './sceneImages'
 import { cancelNarration, isNarrationSupported, speak } from './narration'
 import { loadNarrationEnabled, saveNarrationEnabled } from '../persistence/narrationSettings'
 import './StoryShell.css'
@@ -322,11 +322,16 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
   }
 
   const availableChoices = scene.type === 'ending' ? [] : scene.choices.filter((choice) => isChoiceAvailable(party, choice.condition))
+  const actNumber = actNumberForScene(scene.id)
+  const actBackdrop = actNumber !== undefined ? ACT_BACKDROPS[actNumber] : undefined
 
   return (
     <div className="story-shell">
       <PartyPanel party={displayParty} onUseItem={handleUseItem} />
-      <main className="story-shell__main">
+      <main
+        className="story-shell__main"
+        style={actBackdrop ? { backgroundImage: `url(${actBackdrop})` } : undefined}
+      >
         <StoryLog entries={entries} />
         <SceneImage sceneId={scene.id} />
         {scene.type === 'ending' ? (

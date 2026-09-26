@@ -10,6 +10,8 @@ interface StoryInterstitialProps {
   onContinue: () => void
   /** Read the title/subtitle/body aloud once, on mount, if narration is enabled. */
   narrate?: boolean
+  /** Optional full-bleed backdrop image (chapter breaks only, when art exists for that act). */
+  backdrop?: string
 }
 
 // A full-screen moment that pauses the normal log/choices flow — used for
@@ -24,6 +26,7 @@ export function StoryInterstitial({
   continueLabel = 'Continue',
   onContinue,
   narrate = false,
+  backdrop,
 }: StoryInterstitialProps) {
   const hasSpokenRef = useRef(false)
 
@@ -36,8 +39,10 @@ export function StoryInterstitial({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const style = backdrop ? { backgroundImage: `url(${backdrop})` } : undefined
+
   return (
-    <div className={`story-interstitial story-interstitial--${kind}`}>
+    <div className={`story-interstitial story-interstitial--${kind}${backdrop ? ' story-interstitial--has-backdrop' : ''}`} style={style}>
       {subtitle && <p className="story-interstitial__subtitle">{subtitle}</p>}
       <h2 className="story-interstitial__title">{title}</h2>
       {body && <p className="story-interstitial__body">{body}</p>}

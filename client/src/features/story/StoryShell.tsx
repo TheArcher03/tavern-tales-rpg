@@ -28,6 +28,8 @@ import { LevelUpChoice } from './LevelUpChoice'
 import { ShopScreen } from './ShopScreen'
 import { DiceRollReveal } from './DiceRollReveal'
 import { SkillsGuide } from './SkillsGuide'
+import { SceneImage } from './SceneImage'
+import { CHAPTER_BACKDROPS } from './sceneImages'
 import { cancelNarration, isNarrationSupported, speak } from './narration'
 import { loadNarrationEnabled, saveNarrationEnabled } from '../persistence/narrationSettings'
 import './StoryShell.css'
@@ -266,6 +268,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
             body={initialChapterBreak.enteringSubtitle}
             onContinue={dismissInitialChapterBreak}
             narrate={narrationEnabled}
+            backdrop={CHAPTER_BACKDROPS[party.currentSceneId]}
           />
         </main>
       </div>
@@ -310,6 +313,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
               body={pendingStep.chapterBreak.enteringSubtitle}
               onContinue={advancePending}
               narrate={narrationEnabled}
+              backdrop={CHAPTER_BACKDROPS[pending!.nextSceneId]}
             />
           )}
         </main>
@@ -324,6 +328,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
       <PartyPanel party={displayParty} onUseItem={handleUseItem} />
       <main className="story-shell__main">
         <StoryLog entries={entries} />
+        <SceneImage sceneId={scene.id} />
         {scene.type === 'ending' ? (
           <p className="story-shell__ending-note">The story ends here.</p>
         ) : (

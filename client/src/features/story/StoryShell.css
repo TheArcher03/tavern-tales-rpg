@@ -4,6 +4,34 @@
   font-family: var(--font-body);
 }
 
+/* Below this width the fixed-width party panel and the main column no
+   longer fit side by side without squeezing the log text down to
+   single-character line wraps — stack them and let the page itself
+   scroll instead of relying on a clipped inner scroll region. */
+@media (max-width: 700px) {
+  .story-shell {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .party-panel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    overflow-y: visible;
+  }
+
+  .story-shell__main {
+    flex: none;
+  }
+
+  .story-log {
+    flex: none;
+    overflow-y: visible;
+  }
+}
+
 .character-sheet {
   width: 16rem;
   flex-shrink: 0;

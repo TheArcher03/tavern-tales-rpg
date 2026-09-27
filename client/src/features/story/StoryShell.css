@@ -168,17 +168,17 @@
 }
 
 .scene-image {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
+  /* A message bubble like any other entry in the log — sized to hug the
+     image itself (not stretched to the log's full width by the column's
+     default cross-axis stretch), which is what was leaving bare space
+     around narrower/portrait images before. */
+  align-self: flex-start;
+  display: inline-block;
+  padding: 0.35rem;
   border-radius: 0.6rem;
   border: 1px solid var(--color-border);
-  overflow: hidden;
+  background: var(--color-bg-entry-dm);
   max-width: 28rem;
-  /* Bounded so a tall portrait-orientation image can never dominate the
-     viewport and push the log/choices out of reach — width still scales
-     down to fit, this only clamps how tall it's allowed to get. */
-  max-height: 45vh;
 }
 
 .scene-image img {
@@ -186,7 +186,10 @@
   width: auto;
   height: auto;
   max-width: 100%;
+  /* Bounded so a tall portrait-orientation image can never dominate the
+     viewport and push the rest of the log out of reach. */
   max-height: 45vh;
+  border-radius: 0.35rem;
 }
 
 .story-shell__loading {

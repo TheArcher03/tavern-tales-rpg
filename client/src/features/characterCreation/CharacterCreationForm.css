@@ -12,6 +12,34 @@
   border-radius: 0.75rem;
 }
 
+.character-creation__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.character-creation__header h1 {
+  margin: 0;
+}
+
+.character-creation__randomize {
+  flex-shrink: 0;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  border-radius: 50%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.character-creation__randomize:hover {
+  background: var(--color-bg);
+  border-color: var(--color-accent);
+}
+
 .character-creation__field {
   display: flex;
   flex-direction: column;

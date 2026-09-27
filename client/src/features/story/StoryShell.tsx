@@ -28,8 +28,7 @@ import { LevelUpChoice } from './LevelUpChoice'
 import { ShopScreen } from './ShopScreen'
 import { DiceRollReveal } from './DiceRollReveal'
 import { SkillsGuide } from './SkillsGuide'
-import { SceneImage } from './SceneImage'
-import { ACT_BACKDROPS, CHAPTER_BACKDROPS, actNumberForScene } from './sceneImages'
+import { ACT_BACKDROPS, CHAPTER_BACKDROPS, SCENE_IMAGES, actNumberForScene } from './sceneImages'
 import { cancelNarration, isNarrationSupported, speak } from './narration'
 import { loadNarrationEnabled, saveNarrationEnabled } from '../persistence/narrationSettings'
 import './StoryShell.css'
@@ -65,6 +64,16 @@ function buildActorInfo(party: PartyState, choice: EncounterChoice): ChoiceActor
   const proficient = choice.skill ? actor.skillProficiencies.includes(choice.skill) : false
   const modifier = actor.abilityModifiers[choice.ability] + (proficient ? actor.proficiencyBonus : 0)
   return { name: actor.name, ability: choice.ability, modifier, proficient }
+}
+
+// A scene's narration entry, plus its illustration (if one exists) as its
+// own entry right after — this makes the image a permanent part of the
+// scrollable log, same as any other message, instead of a separate panel
+// that vanishes the moment the scene changes.
+function sceneLogEntries(sceneId: string, narration: string): StoryEntry[] {
+  const entries: StoryEntry[] = [{ id: crypto.randomUUID(), speaker: 'dm', text: narration }]
+  if (SCENE_IMAGES[sceneId]) entries.push({ id: crypto.randomUUID(), speaker: 'image', text: sceneId })
+  return entries
 }
 
 interface PendingTransition {
@@ -127,14 +136,14 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
     if (scene.type === 'narration' && scene.chapterBreak) {
       setInitialChapterBreak(scene.chapterBreak)
     } else {
-      onEntriesChange([{ id: crypto.randomUUID(), speaker: 'dm', text: scene.narration }])
+      onEntriesChange(sceneLogEntries(scene.id, scene.narration))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const dismissInitialChapterBreak = () => {
     setInitialChapterBreak(null)
-    onEntriesChange([{ id: crypto.randomUUID(), speaker: 'dm', text: scene.narration }])
+    onEntriesChange(sceneLogEntries(scene.id, scene.narration))
   }
 
   // Commits a fully-resolved transition: appends log entries and advances
@@ -148,7 +157,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
       if (nextScene.type === 'ending') {
         next.push({ id: crypto.randomUUID(), speaker: 'system', text: `🏁 ${nextScene.title}` })
       }
-      next.push({ id: crypto.randomUUID(), speaker: 'dm', text: nextScene.narration })
+      next.push(...sceneLogEntries(nextSceneId, nextScene.narration))
       return next
     })
     onPartyChange({ ...finalParty, currentSceneId: nextSceneId })
@@ -333,7 +342,6 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
         style={actBackdrop ? { backgroundImage: `url(${actBackdrop})` } : undefined}
       >
         <StoryLog entries={entries} />
-        <SceneImage sceneId={scene.id} />
         {scene.type === 'ending' ? (
           <p className="story-shell__ending-note">The story ends here.</p>
         ) : (

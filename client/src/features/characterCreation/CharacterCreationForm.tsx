@@ -3,9 +3,12 @@ import {
   ABILITY_NAMES,
   BACKGROUNDS,
   CHARACTER_CLASSES,
+  POINT_BUY_BUDGET,
+  POINT_BUY_MAX_SCORE,
   POINT_BUY_MIN_SCORE,
   RACES,
   createCharacter,
+  pointBuyCost,
   validatePointBuy,
   type AbilityName,
   type AbilityScores,
@@ -15,8 +18,60 @@ import { AbilityScoreAllocator } from './AbilityScoreAllocator'
 import { ClassIcon } from '../story/ClassIcon'
 import './CharacterCreationForm.css'
 
+const RANDOM_NAME_POOL = [
+  'Aria',
+  'Bram',
+  'Cassia',
+  'Doran',
+  'Elspeth',
+  'Fenn',
+  'Guin',
+  'Halric',
+  'Ivo',
+  'Jessa',
+  'Kellan',
+  'Liora',
+  'Merrick',
+  'Nessa',
+  'Orin',
+  'Perrin',
+  'Quenna',
+  'Roswyn',
+  'Sabine',
+  'Torvald',
+]
+
 function defaultAbilityScores(): AbilityScores {
   return Object.fromEntries(ABILITY_NAMES.map((name) => [name, POINT_BUY_MIN_SCORE])) as AbilityScores
+}
+
+function pickRandom<T>(items: readonly T[]): T {
+  return items[Math.floor(Math.random() * items.length)]
+}
+
+// Spends the full point-buy budget across randomly-ordered abilities —
+// unlike the companion generator's class-weighted allocation, this is
+// meant to feel like a genuine reroll, not a tuned build.
+function randomAbilityScores(): AbilityScores {
+  const scores = defaultAbilityScores()
+  let remaining = POINT_BUY_BUDGET
+  let incrementable = [...ABILITY_NAMES]
+
+  while (incrementable.length > 0) {
+    const name = pickRandom(incrementable)
+    const cost = pointBuyCost(scores[name] + 1) - pointBuyCost(scores[name])
+    if (cost > remaining) {
+      incrementable = incrementable.filter((candidate) => candidate !== name)
+      continue
+    }
+    scores[name] += 1
+    remaining -= cost
+    if (scores[name] >= POINT_BUY_MAX_SCORE) {
+      incrementable = incrementable.filter((candidate) => candidate !== name)
+    }
+  }
+
+  return scores
 }
 
 interface CharacterCreationFormProps {
@@ -33,6 +88,15 @@ export function CharacterCreationForm({ onCreate }: CharacterCreationFormProps) 
 
   const adjustAbility = (name: AbilityName, delta: 1 | -1) => {
     setAbilityScores((scores) => ({ ...scores, [name]: scores[name] + delta }))
+  }
+
+  const randomize = () => {
+    setName(pickRandom(RANDOM_NAME_POOL))
+    setRaceId(pickRandom(RACES).id)
+    setClassId(pickRandom(CHARACTER_CLASSES).id)
+    setBackgroundId(pickRandom(BACKGROUNDS).id)
+    setAbilityScores(randomAbilityScores())
+    setError(null)
   }
 
   const canSubmit = name.trim().length > 0 && validatePointBuy(abilityScores).valid
@@ -56,7 +120,18 @@ export function CharacterCreationForm({ onCreate }: CharacterCreationFormProps) 
 
   return (
     <form className="character-creation" onSubmit={handleSubmit}>
-      <h1>Create your character</h1>
+      <div className="character-creation__header">
+        <h1>Create your character</h1>
+        <button
+          type="button"
+          className="character-creation__randomize"
+          onClick={randomize}
+          title="Randomize this character"
+          aria-label="Randomize this character"
+        >
+          🎲
+        </button>
+      </div>
 
       <label className="character-creation__field">
         Name

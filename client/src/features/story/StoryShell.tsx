@@ -275,11 +275,22 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
 
   const displayParty = pending ? pending.party : party
 
+  // Rendered at the top of every screen state (chapter breaks, dice
+  // rolls, the main log) — the footer-only version of this control was
+  // only reachable from the main log view, so it was invisible on the
+  // very first screen a new game shows (the Act I chapter break).
+  const partyPanelToggleButton = (
+    <button type="button" className="story-shell__party-toggle" onClick={togglePartyPanel}>
+      {partyPanelVisible ? '👥 Hide party panel' : '👥 Show party panel'}
+    </button>
+  )
+
   if (initialChapterBreak) {
     return (
       <div className="story-shell">
         {partyPanelVisible && <PartyPanel party={displayParty} onUseItem={handleUseItem} />}
         <main className="story-shell__main">
+          <div className="story-shell__toolbar">{partyPanelToggleButton}</div>
           <StoryInterstitial
             kind="chapter"
             title={initialChapterBreak.enteringTitle}
@@ -300,6 +311,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
       <div className="story-shell">
         {partyPanelVisible && <PartyPanel party={displayParty} onUseItem={handleUseItem} />}
         <main className="story-shell__main">
+          <div className="story-shell__toolbar">{partyPanelToggleButton}</div>
           {pendingStep.kind === 'diceRoll' && (
             <DiceRollReveal
               actorName={pendingStep.actorName}
@@ -351,6 +363,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
         className="story-shell__main"
         style={actBackdrop ? { backgroundImage: `url(${actBackdrop})` } : undefined}
       >
+        <div className="story-shell__toolbar">{partyPanelToggleButton}</div>
         <StoryLog entries={entries} />
         {scene.type === 'ending' ? (
           <p className="story-shell__ending-note">The story ends here.</p>
@@ -390,9 +403,6 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
               {narrationEnabled ? '🔊 Narration on' : '🔇 Narration off'}
             </button>
           )}
-          <button type="button" className="story-shell__skills-toggle" onClick={togglePartyPanel}>
-            {partyPanelVisible ? 'Hide party panel' : 'Show party panel'}
-          </button>
         </div>
       </main>
       {showSkillsGuide && <SkillsGuide onClose={() => setShowSkillsGuide(false)} />}

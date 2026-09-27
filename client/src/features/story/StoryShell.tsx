@@ -31,6 +31,7 @@ import { SkillsGuide } from './SkillsGuide'
 import { ACT_BACKDROPS, CHAPTER_BACKDROPS, SCENE_IMAGES, actNumberForScene } from './sceneImages'
 import { cancelNarration, isNarrationSupported, speak } from './narration'
 import { loadNarrationEnabled, saveNarrationEnabled } from '../persistence/narrationSettings'
+import { loadPartyPanelVisible, savePartyPanelVisible } from '../persistence/partyPanelSettings'
 import './StoryShell.css'
 
 interface StoryShellProps {
@@ -93,6 +94,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
   const [pending, setPending] = useState<PendingTransition | null>(null)
   const [showSkillsGuide, setShowSkillsGuide] = useState(false)
   const [narrationEnabled, setNarrationEnabled] = useState(loadNarrationEnabled)
+  const [partyPanelVisible, setPartyPanelVisible] = useState(loadPartyPanelVisible)
 
   // Tracks which log entries have already been read aloud. Lives here
   // (not in StoryLog) because StoryLog itself unmounts and remounts every
@@ -124,6 +126,14 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
       const next = !current
       saveNarrationEnabled(next)
       if (!next) cancelNarration()
+      return next
+    })
+  }
+
+  const togglePartyPanel = () => {
+    setPartyPanelVisible((current) => {
+      const next = !current
+      savePartyPanelVisible(next)
       return next
     })
   }
@@ -268,7 +278,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
   if (initialChapterBreak) {
     return (
       <div className="story-shell">
-        <PartyPanel party={displayParty} onUseItem={handleUseItem} />
+        {partyPanelVisible && <PartyPanel party={displayParty} onUseItem={handleUseItem} />}
         <main className="story-shell__main">
           <StoryInterstitial
             kind="chapter"
@@ -288,7 +298,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
   if (pendingStep) {
     return (
       <div className="story-shell">
-        <PartyPanel party={displayParty} onUseItem={handleUseItem} />
+        {partyPanelVisible && <PartyPanel party={displayParty} onUseItem={handleUseItem} />}
         <main className="story-shell__main">
           {pendingStep.kind === 'diceRoll' && (
             <DiceRollReveal
@@ -336,7 +346,7 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
 
   return (
     <div className="story-shell">
-      <PartyPanel party={displayParty} onUseItem={handleUseItem} />
+      {partyPanelVisible && <PartyPanel party={displayParty} onUseItem={handleUseItem} />}
       <main
         className="story-shell__main"
         style={actBackdrop ? { backgroundImage: `url(${actBackdrop})` } : undefined}
@@ -380,6 +390,9 @@ export function StoryShell({ party, onPartyChange, entries, onEntriesChange, onS
               {narrationEnabled ? '🔊 Narration on' : '🔇 Narration off'}
             </button>
           )}
+          <button type="button" className="story-shell__skills-toggle" onClick={togglePartyPanel}>
+            {partyPanelVisible ? 'Hide party panel' : 'Show party panel'}
+          </button>
         </div>
       </main>
       {showSkillsGuide && <SkillsGuide onClose={() => setShowSkillsGuide(false)} />}
